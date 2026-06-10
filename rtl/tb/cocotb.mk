@@ -49,6 +49,11 @@ ifeq ($(TOP),store)
   VERILOG_SOURCES = $(RTL)/fp8_encode.sv $(RTL)/store.sv
   MODULE = test_load_store
 endif
+ifeq ($(TOP),mac_array)
+  VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_array.sv
+  MODULE = test_mac_array
+  COMPILE_ARGS += -GM=4 -GN=4 -GK=8
+endif
 
 TOPLEVEL = $(TOP)
 
