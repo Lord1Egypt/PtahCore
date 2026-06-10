@@ -32,7 +32,12 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [x] 37 tests green total
 
 ## Phase 3 — RTL leaves (each: .sv + cocotb tb vs pymodel twin)
-- [ ] `rtl/mac_cell.sv`
+- [x] `rtl/fp8_decode.sv` — comb. fp8→fp32, both formats (+ exhaustive 512-case TB) (PR #4)
+- [x] `rtl/fp32_mul.sv` — IEEE-754 RNE multiply (subnormals out of scope, documented) (PR #4)
+- [x] `rtl/fp32_add.sv` — full alignment adder, GRS + RNE, bit-exact target vs numpy (PR #4)
+- [x] `rtl/mac_cell.sv` — MAC leaf + TMEM slots + drain port (PR #4)
+- [x] `rtl/tb/` cocotb suites + Makefile (`make all_leaves`) (PR #4)
+- [ ] ⏳ First Verilator run of the four leaf TBs (blocked: `sudo apt-get install verilator`)
 - [ ] `rtl/mac_array.sv` (slice first: 4×4, then full via config)
 - [ ] `rtl/smem.sv` (banked)
 - [ ] `rtl/barrier.sv`
@@ -40,6 +45,12 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [ ] `rtl/store.sv`
 - [ ] `rtl/cmdproc.sv` + REPEAT
 - [ ] Shared: config.py → SV package generator
+
+## Docs ✅ (2026-06-10, PR #4)
+- [x] `docs/ARCHITECTURE.md` — block diagram, memory spaces, engines, module map
+- [x] `docs/ISA.md` — full 6-instruction spec + canonical kernels
+- [x] `docs/DEVELOPMENT.md` — workflow, RTL/verification conventions, numeric contracts
+- [x] `docs/ENGINEERING.md` — honest status table + differentiators vs autogpu
 
 ## Phase 4 — RTL integration
 - [ ] `rtl/chip_top.sv` + behavioral DRAM TB
