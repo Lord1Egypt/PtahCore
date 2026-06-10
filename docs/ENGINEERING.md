@@ -20,7 +20,7 @@ for both Python and SV.
 | 2 | Cycle-level pymodel, e2e matmul | ✅ done — 37 tests, bit-exact |
 | 3 | RTL modules vs pymodel (cocotb) | ✅ done — 11 units, 45 tests |
 | 4 | Full RTL integration + e2e | ✅ done — chip_top runs multi-tile matmul |
-| 5 | Synthesis smoke (sky130 → ASAP7) | ⬜ |
+| 5 | Synthesis smoke (Yosys elaboration + area) | ✅ done — 0 latches, baseline in docs/SYNTHESIS.md |
 | 6 | Hardening: leaf tiles | ⬜ |
 | 7 | Hardening: array + chip (traveling clock) | ⬜ |
 | 8 | HW block scaling (MX-style) | ⬜ |

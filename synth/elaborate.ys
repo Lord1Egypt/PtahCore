@@ -1,0 +1,30 @@
+# PtahCore — Yosys elaboration + latch/area smoke for the whole chip.
+#
+#   yowasp-yosys -s synth/elaborate.ys
+#
+# Goals (Phase 5): the chip elaborates, NO inferred latches (asserted), and
+# a generic gate-level cell count as a first area proxy. Real area/timing
+# come from ASAP7 P&R in Phase 6. Sim-only assertions guarded by SYNTHESIS.
+
+read_verilog -sv -DSYNTHESIS \
+    rtl/fp8_decode.sv rtl/fp8_encode.sv rtl/fp32_mul.sv rtl/fp32_add.sv \
+    rtl/mac_cell.sv rtl/mac_array.sv rtl/smem.sv rtl/barrier.sv \
+    rtl/load.sv rtl/store.sv rtl/cmdproc.sv rtl/mma_unit.sv rtl/chip_top.sv
+
+# Shrink the array to 4x4x8 so generic synthesis stays tractable; the logic
+# is parameter-identical to the 32x32 build.
+hierarchy -check -top chip_top -chparam M 4 -chparam N 4 -chparam K 8
+
+proc
+opt
+
+# Hard gate: any inferred latch fails the run.
+select -assert-none t:$dlatch
+select -assert-none t:$_DLATCH_
+
+# RTL-level cell stat (pre-techmap). The full gate-level flatten of the
+# whole chip is intentionally NOT done here: SMEM is a 64 KiB behavioral
+# array that maps to an SRAM macro in hardening, not flip-flops — expanding
+# it to gates is both wrong and enormous. Per-module gate counts (the real
+# area proxy for the compute path) live in synth/area.ys.
+stat

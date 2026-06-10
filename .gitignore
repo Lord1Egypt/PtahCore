@@ -8,3 +8,7 @@ results/
 *.fst
 sim_build*/
 results.xml
+
+# synthesis artifacts
+synth/area.txt
+synth/*.log

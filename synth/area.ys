@@ -1,0 +1,27 @@
+# PtahCore — per-module generic gate-level area baseline.
+#
+#   yowasp-yosys -s synth/area.ys
+#
+# Synthesizes the compute-path modules individually to generic gates and
+# prints cell counts. The mac_cell figure is the headline number: it gets
+# instantiated M*N = 1024 times in the full 32x32 array, so its gate count
+# dominates chip area. SMEM and the full chip are excluded (behavioral
+# memory → SRAM macro at hardening; see synth/elaborate.ys).
+
+read_verilog -sv -DSYNTHESIS \
+    rtl/fp8_decode.sv rtl/fp8_encode.sv rtl/fp32_mul.sv rtl/fp32_add.sv \
+    rtl/mac_cell.sv rtl/barrier.sv rtl/load.sv rtl/store.sv rtl/cmdproc.sv
+
+synth -top fp8_decode;  tee -a synth/area.txt stat -top fp8_decode
+design -reset
+read_verilog -sv -DSYNTHESIS rtl/fp32_mul.sv
+synth -top fp32_mul;    tee -a synth/area.txt stat -top fp32_mul
+design -reset
+read_verilog -sv -DSYNTHESIS rtl/fp32_add.sv
+synth -top fp32_add;    tee -a synth/area.txt stat -top fp32_add
+design -reset
+read_verilog -sv -DSYNTHESIS rtl/fp8_encode.sv
+synth -top fp8_encode;  tee -a synth/area.txt stat -top fp8_encode
+design -reset
+read_verilog -sv -DSYNTHESIS rtl/fp32_mul.sv rtl/fp32_add.sv rtl/mac_cell.sv
+synth -top mac_cell;    tee -a synth/area.txt stat -top mac_cell

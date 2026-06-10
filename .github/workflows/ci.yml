@@ -16,7 +16,10 @@ jobs:
           python-version: '3.12'
 
       - name: Install deps
-        run: pip install numpy pytest
+        run: pip install numpy pytest yowasp-yosys
 
       - name: Golden model tests
         run: pytest -q
+
+      - name: Synthesis smoke (elaboration + no latches)
+        run: yowasp-yosys -s synth/elaborate.ys

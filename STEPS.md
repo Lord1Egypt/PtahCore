@@ -6,9 +6,12 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 > Phases 0–4 complete. **The whole chip works** — `chip_top.sv` runs a full
 > multi-tile matmul end-to-end through real Verilog, bit-exact vs golden.
 > **Score: 89 tests green (52 RTL + 37 Python), 8 PRs merged.**
-> **Next up = Phase 5: synthesis smoke** — Yosys elaboration (no latches),
-> then sky130 + ASAP7 first synth for area/timing baselines. Run
-> `cd rtl/tb && make all_leaves` to re-verify all 13 RTL units first.
+> **Next up = Phase 6: ASAP7 7nm hardening** — install OpenROAD/ORFS + ASAP7
+> PDK, then synth→floorplan→P&R→GDSII for mac_cell first (the tile that abuts
+> 1024×), then the array, then chip_top — with honest timing closure (the
+> thing the prior-art chip never achieved). Yosys elaboration + gate baseline
+> already done (Phase 5, `synth/`, `docs/SYNTHESIS.md`). Re-verify RTL with
+> `cd rtl/tb && make all_leaves`; synth smoke = `yowasp-yosys -s synth/elaborate.ys`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
@@ -85,10 +88,20 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 untouched. Column-streaming (option b) is a Phase 6 hardening refactor if the
 fetch latency hurts timing.
 
-## Phase 5 — Synthesis smoke
-- [ ] Yosys elaboration clean (no inferred latches)
-- [ ] sky130 smoke harden of mac_cell
-- [ ] ASAP7 first synth: area/timing baseline numbers
+## Phase 5 — Synthesis smoke  (partly ✅ 2026-06-11, PR #9)
+- [x] Yosys elaboration clean (no inferred latches) — `synth/elaborate.ys`,
+      `hierarchy -check` + `-assert-none t:$dlatch`; runs in CI now
+- [x] Generic gate-level area baseline — `synth/area.ys` → `docs/SYNTHESIS.md`:
+      fp8_decode 60 · fp8_encode 388 · fp32_add 1627 · fp32_mul 3769 ·
+      mac_cell ~5790 gates → array ≈ 5.9M gates (fp32 mul is 65% of a cell)
+- [x] Yosys `break` not supported → rewrote fp32_add MSB scan as ascending
+      priority encoder (still bit-exact, re-verified)
+- [ ] sky130 smoke harden of mac_cell (needs OpenROAD/ORFS — heavy install)
+- [ ] ASAP7 first synth: real area/timing baseline (needs OpenROAD + ASAP7 PDK)
+
+**Note:** SMEM (64 KiB behavioral array) is elaborated + latch-checked but NOT
+gate-mapped — it's an SRAM macro at hardening, and expanding it to FFs OOM-ed
+the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
 
 ## Phase 6 — Hardening: leaves
 - [ ] TILE_SPEC.md — abutment boundary contract (pins, PDN, clock entry/exit)
