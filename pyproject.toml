@@ -14,5 +14,5 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-testpaths = ["golden/tests"]
+testpaths = ["golden/tests", "pymodel/tests"]
 pythonpath = ["."]

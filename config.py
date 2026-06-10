@@ -28,6 +28,9 @@ NUM_BARRIERS = 16                # mbarrier objects, 16 B each, at SMEM base
 BARRIER_BYTES = 16
 BARRIER_REGION = NUM_BARRIERS * BARRIER_BYTES   # reserved SMEM prefix
 
+# ── Engine timing ────────────────────────────────────────────────────
+LOAD_BYTES_PER_CYCLE = 16       # DMA bandwidth gmem→smem
+
 # ── Command front-end ────────────────────────────────────────────────
 CMD_FIFO_DEPTH = 256            # instructions
 INSTR_BITS = 64                 # fixed-width encoding

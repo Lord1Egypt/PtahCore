@@ -16,18 +16,20 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [x] `golden/matmul_reference.py` — fp8×fp8→fp32 reference vs numpy
 - [x] `golden/tests/` — exhaustive 256-value roundtrip + random matmul property tests (20 tests green)
 
-## Phase 2 — pymodel (cycle-level behavioral)
-- [ ] Module spec template (INPUTS/OUTPUTS/STATE/BEHAVIOR/INVARIANTS per module)
-- [ ] `pymodel/mac_cell.py` — fp8 MAC + 4-slot fp32 accumulator + drain port
-- [ ] `pymodel/mac_array.py` — 32×32 broadcast grid
-- [ ] `pymodel/smem.py`, `pymodel/gmem.py` — banked scratchpad + DRAM model
-- [ ] `pymodel/barrier.py` — mbarrier (pending/expected/tx/phase, flip rule)
-- [ ] `pymodel/load.py` — async DMA engine, tx-counted arrivals
-- [ ] `pymodel/store.py` — **async** drain engine (improvement #1 over autogpu)
-- [ ] `pymodel/repeat.py` — REPEAT sequencer (improvement #2)
-- [ ] `pymodel/cmdproc.py` — decode + dispatch + WAIT stall
-- [ ] `pymodel/sim.py` — harness; e2e single-tile matmul bit-exact
-- [ ] e2e: K-loop pipelined matmul w/ double-buffered SMEM, REPEAT-driven
+## Phase 2 — pymodel (cycle-level behavioral) ✅ (2026-06-10, PR #3)
+- [x] Module specs as docstrings (INPUTS/OUTPUTS/STATE/BEHAVIOR/INVARIANTS per module)
+- [x] `pymodel/mac_array.py` — 32×32 broadcast grid w/ distributed TMEM slots (mac_cell folded in; RTL splits it back out)
+- [x] `pymodel/smem.py`, `pymodel/gmem.py` — scratchpad + DRAM model
+- [x] `pymodel/barrier.py` — mbarrier (pending/expected/tx/phase, flip rule)
+- [x] `pymodel/load.py` — async DMA engine, tx-counted arrivals, 16 B/cycle
+- [x] `pymodel/store.py` — **async** drain engine (improvement #1 over autogpu) — fp32 + fp8 out
+- [x] REPEAT sequencer — lives inside `cmdproc.py` (capture body → strided replay) (improvement #2)
+- [x] `pymodel/cmdproc.py` — decode + dispatch + WAIT stall + **auto-phase WAIT** (improvement #3: no software phase bookkeeping; WAIT legal inside REPEAT)
+- [x] `pymodel/isa.py` — instruction dataclasses w/ per-iteration strides
+- [x] `pymodel/sim.py` — harness; e2e single-tile matmul **bit-exact** vs golden
+- [x] e2e: 4-tile K-loop driven by ONE REPEAT block — bit-exact
+- [x] e2e: async STORE proven to overlap next kernel's LOAD (the autogpu-can't-do-this test)
+- [x] 37 tests green total
 
 ## Phase 3 — RTL leaves (each: .sv + cocotb tb vs pymodel twin)
 - [ ] `rtl/mac_cell.sv`
