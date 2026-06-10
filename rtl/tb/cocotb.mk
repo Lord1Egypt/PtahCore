@@ -54,6 +54,10 @@ ifeq ($(TOP),mac_array)
   MODULE = test_mac_array
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
 endif
+ifeq ($(TOP),cmdproc_tb_top)
+  VERILOG_SOURCES = $(RTL)/barrier.sv $(RTL)/cmdproc.sv $(RTL)/cmdproc_tb_top.sv
+  MODULE = test_cmdproc
+endif
 
 TOPLEVEL = $(TOP)
 

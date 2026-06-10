@@ -45,9 +45,10 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [x] `rtl/load.sv` — async DMA engine, 16 B/cycle, issue-time tx, done pulse (PR #6)
 - [x] `rtl/store.sv` — **async** drain engine, fp32 + fp8 out via fp8_encode (PR #6)
 - [x] All verified: `make all_leaves` = 9 units, 31 RTL cocotb tests green
-- [ ] `rtl/mac_array.sv` (slice first: 4×4, then full via config) — next session
-- [ ] `rtl/cmdproc.sv` + REPEAT + auto-phase WAIT — next session
-- [ ] Shared: config.py → SV package generator
+- [x] `rtl/mac_array.sv` — 32×32 broadcast grid, M+N edge decoders, distributed-TMEM drain; bit-exact at 4×4×8 vs golden (PR #7)
+- [x] `rtl/cmdproc.sv` — FIFO front-end, REPEAT capture/replay w/ strides, **auto-phase WAIT**, engine-busy stall + `cmdproc_tb_top.sv` (cmdproc + real barrier) (PR #7)
+- [x] **Phase 3 RTL COMPLETE**: 11 units, 45 RTL cocotb tests + 37 Python = 82 green
+- [ ] Shared: config.py → SV package generator (deferred to Phase 4 chip_top wiring)
 
 ## Docs ✅ (2026-06-10, PR #4)
 - [x] `docs/ARCHITECTURE.md` — block diagram, memory spaces, engines, module map
