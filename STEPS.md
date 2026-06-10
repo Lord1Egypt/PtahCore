@@ -37,7 +37,8 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [x] `rtl/fp32_add.sv` — full alignment adder, GRS + RNE, bit-exact target vs numpy (PR #4)
 - [x] `rtl/mac_cell.sv` — MAC leaf + TMEM slots + drain port (PR #4)
 - [x] `rtl/tb/` cocotb suites + Makefile (`make all_leaves`) (PR #4)
-- [ ] ⏳ First Verilator run of the four leaf TBs (blocked: `sudo apt-get install verilator`)
+- [x] First Verilator run: **all 4 leaves PASS** — 14 cocotb tests, bit-exact (fp8_decode 512/512 exhaustive; fp32_add 4051 cases incl. cancellation/carry/RNE-tie edges) (PR #5)
+  - Fixes shaken out: `small` is an SV reserved keyword → `algn`; fp32_mul missing default assignments (latch warnings); per-TOP sim_build dirs; conda-PYTHONHOME vs Verilator helper scripts → `python3-clean` wrapper passed as command-line make var; cocotb pinned `<2` (Debian Verilator 5.020 < 5.036 required by cocotb 2.x)
 - [ ] `rtl/mac_array.sv` (slice first: 4×4, then full via config)
 - [ ] `rtl/smem.sv` (banked)
 - [ ] `rtl/barrier.sv`

@@ -33,7 +33,7 @@ async def _reset(dut):
 @cocotb.test()
 async def mac_chain_bit_exact(dut):
     """32-step MAC chain on slot 0, then verify drain — vs numpy fp32."""
-    cocotb.start_soon(Clock(dut.clk, 2, unit="ns").start())
+    cocotb.start_soon(Clock(dut.clk, 2, "ns").start())
     await _reset(dut)
 
     rng = np.random.default_rng(21)
@@ -61,7 +61,7 @@ async def mac_chain_bit_exact(dut):
 
 @cocotb.test()
 async def slots_independent(dut):
-    cocotb.start_soon(Clock(dut.clk, 2, unit="ns").start())
+    cocotb.start_soon(Clock(dut.clk, 2, "ns").start())
     await _reset(dut)
 
     expect = {}
@@ -85,7 +85,7 @@ async def slots_independent(dut):
 
 @cocotb.test()
 async def en_low_holds_state(dut):
-    cocotb.start_soon(Clock(dut.clk, 2, unit="ns").start())
+    cocotb.start_soon(Clock(dut.clk, 2, "ns").start())
     await _reset(dut)
 
     dut.en.value = 1

@@ -31,7 +31,7 @@ module fp32_add (
     logic [7:0]  el;
     logic [23:0] ml, ms;
     logic [7:0]  d;
-    logic [27:0] big, small, sum;   // {carry, man(24), G, R, S}
+    logic [27:0] big, algn, sum;   // {carry, man(24), G, R, S}
     logic [50:0] shifted;           // alignment with sticky collection
     logic        sub;
     int          p;                 // MSB position of sum
@@ -53,7 +53,7 @@ module fp32_add (
 
         // defaults to satisfy combinational completeness
         sl = 1'b0; ss = 1'b0; el = 8'h0; ml = 24'h0; ms = 24'h0; d = 8'h0;
-        big = 28'h0; small = 28'h0; sum = 28'h0; shifted = 51'h0;
+        big = 28'h0; algn = 28'h0; sum = 28'h0; shifted = 51'h0;
         sub = 1'b0; p = 0; norm = 28'h0; exp = 10'sd0;
         man_out = 23'h0; g = 1'b0; s_bit = 1'b0; round_up = 1'b0;
         man_rnd = 25'h0;
@@ -87,14 +87,14 @@ module fp32_add (
 
             // align smaller mantissa; everything below R ORs into sticky
             if (d >= 8'd27) begin
-                small = {27'b0, |ms};
+                algn = {27'b0, |ms};
             end else begin
                 shifted = {ms, 27'b0} >> d;
-                small   = {1'b0, shifted[50:25], |shifted[24:0]};
+                algn   = {1'b0, shifted[50:25], |shifted[24:0]};
             end
 
             sub = (sl != ss);
-            sum = sub ? (big - small) : (big + small);
+            sum = sub ? (big - algn) : (big + algn);
 
             if (sum == 28'b0) begin
                 y = 32'h0;                          // exact cancellation → +0

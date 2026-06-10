@@ -34,7 +34,7 @@ def _is_nan_bits(b: int) -> bool:
 async def _check(dut, a_bits: int, b_bits: int, want_bits: int, tag: str):
     dut.a.value = a_bits
     dut.b.value = b_bits
-    await Timer(1, unit="ns")
+    await Timer(1, "ns")
     got = int(dut.y.value)
     if _is_nan_bits(want_bits):
         assert _is_nan_bits(got), f"{tag}: want NaN got {got:#010x}"

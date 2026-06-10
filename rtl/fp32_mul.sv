@@ -40,7 +40,10 @@ module fp32_mul (
         bi = (eb == 8'hFF) && (fb == 23'h0);
         sy = sa ^ sb;
 
-        // defaults
+        // defaults — every always_comb variable assigned on every path
+        ma = 24'h0; mb = 24'h0; raw = 48'h0; exp = 10'sd0;
+        man_out = 23'h0; guard = 1'b0; sticky = 1'b0;
+        round_up = 1'b0; man_rnd = 25'h0;
         y = 32'h0;
 
         if (an || bn || (ai && bz) || (bi && az)) begin

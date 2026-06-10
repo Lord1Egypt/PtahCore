@@ -1,0 +1,4 @@
+#!/bin/sh
+# Verilator helper scripts need a PYTHONHOME-free system python —
+# cocotb exports a conda PYTHONHOME that breaks /usr/bin/python3.
+exec env -u PYTHONHOME /usr/bin/python3 "$@"

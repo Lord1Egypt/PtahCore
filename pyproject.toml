@@ -10,7 +10,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "cocotb>=1.9",
+    "cocotb>=1.9,<2",
 ]
 
 [tool.pytest.ini_options]
