@@ -1,0 +1,66 @@
+"""PtahCore ISA — instruction objects consumed by the command processor.
+
+Design notes vs. classic Hopper/Blackwell-style ISAs:
+
+* WAIT carries NO phase operand. The cmdproc keeps a per-barrier expected-
+  phase tracker in hardware; WAIT(bar) blocks until the barrier's phase
+  differs from the tracked value, then toggles the tracker. This removes
+  the error-prone software phase bookkeeping entirely — and makes WAIT
+  legal inside REPEAT bodies (a phase immediate would go stale across
+  iterations).
+
+* REPEAT(count, length): the next `length` instructions form a body that
+  executes `count` times total. Body instructions may carry `*_step`
+  strides, added once per iteration (iteration index i: addr + i*step).
+  This is how a K-loop becomes 6 FIFO entries instead of 6*K.
+"""
+
+from dataclasses import dataclass
+
+
+@dataclass
+class BarInit:
+    bar: int          # barrier index (0..NUM_BARRIERS-1)
+    count: int        # expected arrivals per phase
+
+
+@dataclass
+class Load:
+    bar: int
+    gmem: int         # source byte address
+    smem: int         # destination byte offset
+    nbytes: int       # multiple of 16
+    gstep: int = 0    # per-REPEAT-iteration stride on gmem
+    sstep: int = 0    # per-REPEAT-iteration stride on smem
+
+
+@dataclass
+class Mma:
+    bar: int
+    a_smem: int       # A tile offset, (M, K) fp8 row-major
+    b_smem: int       # B tile offset, (N, K) fp8 row-major
+    slot: int         # TMEM accumulator slot
+    accum: int = 0    # 0 = zero slot first, 1 = accumulate
+    fmt: str = "e4m3"
+    astep: int = 0
+    bstep: int = 0
+
+
+@dataclass
+class Store:
+    bar: int
+    gmem: int         # destination byte address
+    slot: int         # TMEM slot to drain
+    dtype: int = 0    # 0 = fp32 out, 1 = fp8 e4m3 out
+    gstep: int = 0
+
+
+@dataclass
+class Wait:
+    bar: int          # auto-phase: hardware tracks expected phase
+
+
+@dataclass
+class Repeat:
+    count: int        # total iterations (count >= 1)
+    length: int       # number of following instructions in the body
