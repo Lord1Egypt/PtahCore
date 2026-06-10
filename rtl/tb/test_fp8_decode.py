@@ -22,7 +22,7 @@ async def exhaustive_both_formats(dut):
         dut.fmt.value = fmt_bit
         for byte in range(256):
             dut.in8.value = byte
-            await Timer(1, unit="ns")
+            await Timer(1, "ns")
             got = int(dut.out.value)
             want = decode(byte, fmt)
             if math.isnan(want):

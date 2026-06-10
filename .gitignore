@@ -6,4 +6,5 @@ build/
 results/
 *.vcd
 *.fst
-sim_build/
+sim_build*/
+results.xml
