@@ -29,6 +29,26 @@ ifeq ($(TOP),mac_cell)
   VERILOG_SOURCES = $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv
   MODULE = test_mac_cell
 endif
+ifeq ($(TOP),fp8_encode)
+  VERILOG_SOURCES = $(RTL)/fp8_encode.sv
+  MODULE = test_fp8_encode
+endif
+ifeq ($(TOP),smem)
+  VERILOG_SOURCES = $(RTL)/smem.sv
+  MODULE = test_smem_barrier
+endif
+ifeq ($(TOP),barrier)
+  VERILOG_SOURCES = $(RTL)/barrier.sv
+  MODULE = test_smem_barrier
+endif
+ifeq ($(TOP),load)
+  VERILOG_SOURCES = $(RTL)/load.sv
+  MODULE = test_load_store
+endif
+ifeq ($(TOP),store)
+  VERILOG_SOURCES = $(RTL)/fp8_encode.sv $(RTL)/store.sv
+  MODULE = test_load_store
+endif
 
 TOPLEVEL = $(TOP)
 

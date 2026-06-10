@@ -24,6 +24,11 @@ all_leaves:
 	$(MAKE) sim TOP=fp32_mul
 	$(MAKE) sim TOP=fp32_add
 	$(MAKE) sim TOP=mac_cell
+	$(MAKE) sim TOP=fp8_encode
+	$(MAKE) sim TOP=smem
+	$(MAKE) sim TOP=barrier
+	$(MAKE) sim TOP=load
+	$(MAKE) sim TOP=store
 
 clean:
 	rm -rf sim_build_* results.xml dump.vcd __pycache__

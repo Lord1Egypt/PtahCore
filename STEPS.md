@@ -39,12 +39,14 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [x] `rtl/tb/` cocotb suites + Makefile (`make all_leaves`) (PR #4)
 - [x] First Verilator run: **all 4 leaves PASS** — 14 cocotb tests, bit-exact (fp8_decode 512/512 exhaustive; fp32_add 4051 cases incl. cancellation/carry/RNE-tie edges) (PR #5)
   - Fixes shaken out: `small` is an SV reserved keyword → `algn`; fp32_mul missing default assignments (latch warnings); per-TOP sim_build dirs; conda-PYTHONHOME vs Verilator helper scripts → `python3-clean` wrapper passed as command-line make var; cocotb pinned `<2` (Debian Verilator 5.020 < 5.036 required by cocotb 2.x)
-- [ ] `rtl/mac_array.sv` (slice first: 4×4, then full via config)
-- [ ] `rtl/smem.sv` (banked)
-- [ ] `rtl/barrier.sv`
-- [ ] `rtl/load.sv`
-- [ ] `rtl/store.sv`
-- [ ] `rtl/cmdproc.sv` + REPEAT
+- [x] `rtl/fp8_encode.sv` — comb fp32→fp8 e4m3 RNE saturating (STORE path) + roundtrip/boundary/sweep TB (PR #6)
+- [x] `rtl/smem.sv` — 1 write + 2 read ports, registered reads, barrier-region guard (PR #6)
+- [x] `rtl/barrier.sv` — mbarrier file, 5 producer ports, same-cycle multi-arrive, flip rule (PR #6)
+- [x] `rtl/load.sv` — async DMA engine, 16 B/cycle, issue-time tx, done pulse (PR #6)
+- [x] `rtl/store.sv` — **async** drain engine, fp32 + fp8 out via fp8_encode (PR #6)
+- [x] All verified: `make all_leaves` = 9 units, 31 RTL cocotb tests green
+- [ ] `rtl/mac_array.sv` (slice first: 4×4, then full via config) — next session
+- [ ] `rtl/cmdproc.sv` + REPEAT + auto-phase WAIT — next session
 - [ ] Shared: config.py → SV package generator
 
 ## Docs ✅ (2026-06-10, PR #4)
