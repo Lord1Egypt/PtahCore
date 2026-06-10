@@ -103,10 +103,20 @@ fetch latency hurts timing.
 gate-mapped — it's an SRAM macro at hardening, and expanding it to FFs OOM-ed
 the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
 
-## Phase 6 — Hardening: leaves
-- [ ] TILE_SPEC.md — abutment boundary contract (pins, PDN, clock entry/exit)
-- [ ] mac_cell tile: clean GDS, 0 DRC, timing closed
-- [ ] FAILURES.md + RCA discipline docs (capture every flow error once)
+## Phase 6 — Hardening: leaves  ← **IN PROGRESS**
+- [x] `docs/TILE_SPEC.md` — abutment boundary contract (outline, edge power,
+      opposing-edge clock, per-edge signal pins, .lib characterisation) (PR #10)
+- [x] `docs/INVARIANTS.md` — machine-checkable build/RTL invariants; B4 bans
+      negative hold margin (autogpu's cardinal sin) (PR #10)
+- [x] `docs/HARDENING.md` — honest results log + failure table (PR #10)
+- [x] ORFS flow infra: `flow/designs/asap7/mac_cell/{config.mk,constraint.sdc}`
+      (250 MHz target) + `flow/harden.sh` docker runner (PR #10)
+- [x] Solved WSL2 docker-credential-desktop.exe blocker → `DOCKER_CONFIG=/tmp/dockercfg`
+      with `{}` config skips the Windows cred helper for public pulls
+- [ ] ⏳ Pull `openroad/orfs:latest` (large image, in progress) then
+      `flow/harden.sh mac_cell` → first real GDS, timing, DRC numbers
+- [ ] mac_cell tile: clean GDS, 0 DRC, timing closed at 250 MHz (honest)
+- [ ] FAILURES table population (capture every flow error once, in HARDENING.md)
 
 ## Phase 7 — Hardening: array + chip
 - [ ] Abutted row (1×32) with traveling clock

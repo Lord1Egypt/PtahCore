@@ -21,7 +21,7 @@ for both Python and SV.
 | 3 | RTL modules vs pymodel (cocotb) | ✅ done — 11 units, 45 tests |
 | 4 | Full RTL integration + e2e | ✅ done — chip_top runs multi-tile matmul |
 | 5 | Synthesis smoke (Yosys elaboration + area) | ✅ done — 0 latches, baseline in docs/SYNTHESIS.md |
-| 6 | Hardening: leaf tiles | ⬜ |
+| 6 | Hardening: leaf tiles | 🔨 in progress — ORFS flow + tile spec ready, P&R pending |
 | 7 | Hardening: array + chip (traveling clock) | ⬜ |
 | 8 | HW block scaling (MX-style) | ⬜ |
 | 9 | 2:4 structured sparsity | ⬜ |
@@ -55,10 +55,9 @@ every line here is original):
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Block diagram, memory spaces, engines, module map |
 | [ISA.md](ISA.md) | The six instructions, barrier semantics, canonical kernels |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | **Read before writing code** — workflow, conventions, numeric contracts |
+| [SYNTHESIS.md](SYNTHESIS.md) | Yosys elaboration + generic gate-level area baseline |
+| [TILE_SPEC.md](TILE_SPEC.md) | Abutment boundary contract (written before scaling) |
+| [INVARIANTS.md](INVARIANTS.md) | Machine-checkable build + RTL invariants (incl. the no-masked-hold rule) |
+| [HARDENING.md](HARDENING.md) | ASAP7 P&R results log + failure table (honest numbers only) |
 | [../PLAN.md](../PLAN.md) | The roadmap contract (phases, decisions, risks) |
 | [../STEPS.md](../STEPS.md) | Live execution checklist, ticked per PR |
-
-Planned (created when their phases start): `docs/FAILURES.md` (flow error
-lookup), `docs/INVARIANTS.md` (build-system + RTL invariants),
-`docs/TILE_SPEC.md` (abutment boundary contract — written BEFORE scaling,
-not retrofitted).
