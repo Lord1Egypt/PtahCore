@@ -99,10 +99,11 @@ module fp32_add (
             if (sum == 28'b0) begin
                 y = 32'h0;                          // exact cancellation → +0
             end else begin
-                // locate MSB
+                // locate MSB (priority encoder, no break — ascending scan
+                // keeps overwriting so the final write is the highest set bit)
                 p = 0;
-                for (int k = 27; k >= 0; k--) begin
-                    if (sum[k]) begin p = k; break; end
+                for (int k = 0; k <= 27; k++) begin
+                    if (sum[k]) p = k;
                 end
 
                 if (p == 27) begin
