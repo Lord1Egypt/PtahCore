@@ -120,9 +120,15 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
 - [x] Failure log populated (HARDENING.md): VERILOG_DEFINES -D prefix, SDC
       remove_from_collection, **CTS SIGILL (WSL2 CPU lacks AVX-class instr —
       env blocker, stops CTS→route→GDS here)**
-- [ ] **Phase 6b: pipeline the MAC cell** (register between fp32 mul and add;
-      propagate latency through mac_array K-loop + pymodel + tests, keep
-      bit-exact) → then closes 250 MHz
+- [x] **Phase 6b: pipelined MAC cell** — split mul↔add + pipelined fp32_mul
+      (registered 24×24 product); array absorbs +1 latency via flush cycle;
+      **bit-exact (89 tests)**. WNS −2237 → **−1309 ps**, area 833 → 820 µm² (PR #12)
+- [x] Root cause of remaining violation pinpointed: critical path is now
+      `slot_q → acc` = **fp32_add normalization** (~5.31 ns at ASAP7)
+- [ ] **Phase 6c: pipeline fp32_add** (split align+add from normalize+round,
+      +1 array latency, keep bit-exact, update its clocked TB) → closes 250 MHz
+- [ ] (Phase 7 stretch) width-matched fp8 multiplier (≤4 mantissa bits, not 24)
+      — shrinks the cell + shortens mul stage
 - [ ] Complete CTS→route→GDS on an AVX-capable host or native OpenROAD build
 - [ ] mac_cell tile: clean GDS, 0 DRC, timing closed at 250 MHz (honest)
 

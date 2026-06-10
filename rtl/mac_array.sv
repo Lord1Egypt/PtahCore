@@ -49,8 +49,10 @@ module mac_array #(
     // a_lat byte for (i,k) is at element (i*K + k); likewise B (j*K + k).
     logic [7:0] a_col [M];
     logic [7:0] b_col [N];
+    // column index, clamped during the flush cycle (k_q == K) so the
+    // operand part-select never runs past the latched tile
     logic [31:0] kc;
-    assign kc = k_q;
+    assign kc = (k_q < 32'(K)) ? k_q : (32'(K) - 32'd1);
     always_comb begin
         for (int i = 0; i < M; i++)
             a_col[i] = a_lat[(32'(i)*32'(K) + kc)*8 +: 8];
@@ -70,8 +72,12 @@ module mac_array #(
     endgenerate
 
     // ── the grid ─────────────────────────────────────────────────────
+    // Cells are 2-stage pipelined: drive multiplies for k_q = 0..K-1, then
+    // one flush cycle (k_q == K) where en is low but the cells' delayed
+    // en_q completes the final accumulate. zero is asserted on k_q==0 and
+    // the cell delays it to land with the first product.
     logic        cell_en, cell_zero;
-    assign cell_en   = busy;
+    assign cell_en   = busy && (k_q < 32'(K));
     assign cell_zero = busy && accum_q == 1'b0 && (k_q == '0);
 
     logic [31:0] drain_grid [M*N];
@@ -111,7 +117,10 @@ module mac_array #(
             k_q     <= '0;
         end else if (busy) begin
             k_q <= k_q + 1'b1;
-            if (k_q == 32'(K) - 32'd1) begin   // last column reached
+            // K multiply cycles (0..K-1) + 1 pipeline-flush cycle (K).
+            // The final accumulate latches on the edge leaving k_q==K, so
+            // done pulses then and drain is valid the following cycle.
+            if (k_q == 32'(K)) begin
                 busy <= 1'b0;
                 done <= 1'b1;
             end
