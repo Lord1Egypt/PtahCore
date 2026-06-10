@@ -2,6 +2,14 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
+> **▶ RESUME HERE (as of 2026-06-11, after PR #7):**
+> Phases 0–3 complete. All 11 RTL modules verified bit-exact under Verilator.
+> **Score: 82 tests green (45 RTL + 37 Python), 7 PRs merged.**
+> **Next up = Phase 4: `chip_top.sv` integration** — wire cmdproc → barrier →
+> smem → load → mac_array → store → DRAM-TB into one top module and run a full
+> 32×32×32 matmul through pure Verilog, bit-exact vs golden. The "working chip"
+> milestone. Run `cd rtl/tb && make all_leaves` to re-verify everything first.
+
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
 - [x] Write PLAN.md
@@ -56,11 +64,28 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [x] `docs/DEVELOPMENT.md` — workflow, RTL/verification conventions, numeric contracts
 - [x] `docs/ENGINEERING.md` — honest status table + differentiators vs autogpu
 
-## Phase 4 — RTL integration
-- [ ] `rtl/chip_top.sv` + behavioral DRAM TB
-- [ ] e2e 32×32×32 matmul bit-exact vs golden
-- [ ] Multi-tile + K-loop + REPEAT e2e
+## Phase 4 — RTL integration  ← **NEXT**
+- [ ] `rtl/chip_top.sv` — instantiate cmdproc + barrier + smem + load +
+      mac_array + store; wire the point-to-point paths per docs/ARCHITECTURE.md:
+      - cmdproc.bar_* ↔ barrier; load.done/store.done/mma.done → barrier arrivals
+      - load.smem_wr → smem write port; smem read ports → mac_array a_tile/b_tile
+        (note: array latches full tiles at MMA start — chip_top must present the
+        A/B operand tiles from smem on the mma_start cycle; simplest v1 = a small
+        operand-fetch shim reading the two tiles from smem into the wide buses)
+      - store.drain_* ↔ mac_array drain port; store.gmem_wr → DRAM-TB
+      - load.gmem_rd ↔ DRAM-TB (1-cycle combinational read contract)
+- [ ] `rtl/chip_top_tb_top.sv` + behavioral DRAM model (cocotb)
+- [ ] e2e single-tile 32×32×32 matmul bit-exact vs golden (full size, real K=32)
+- [ ] Multi-tile + K-loop + REPEAT e2e (port pymodel/tests/test_e2e.py programs)
+- [ ] config.py → SV package generator (so chip_top uses MMA_M/N/K from one place)
 - [ ] 🎉 **Ads-grade README + demo assets + About/topics polish**
+
+**Open design note for chip_top:** the mac_array currently takes full A/B
+tiles as wide ports latched at start. Real HW streams columns from smem during
+the K-loop. For Phase 4 v1, either (a) add an operand-fetch FSM that reads both
+tiles from smem into registers before pulsing mma_start, or (b) refactor
+mac_array to a column-streaming interface (smem read port per K-step). Option (b)
+is more hardware-faithful and better for Phase 6 hardening — decide at Phase 4 start.
 
 ## Phase 5 — Synthesis smoke
 - [ ] Yosys elaboration clean (no inferred latches)
