@@ -31,6 +31,8 @@ all_leaves:
 	$(MAKE) sim TOP=store
 	$(MAKE) sim TOP=mac_array
 	$(MAKE) sim TOP=cmdproc_tb_top
+	$(MAKE) sim TOP=mma_unit
+	$(MAKE) sim TOP=chip_top
 
 clean:
 	rm -rf sim_build_* results.xml dump.vcd __pycache__

@@ -2,13 +2,13 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, after PR #7):**
-> Phases 0–3 complete. All 11 RTL modules verified bit-exact under Verilator.
-> **Score: 82 tests green (45 RTL + 37 Python), 7 PRs merged.**
-> **Next up = Phase 4: `chip_top.sv` integration** — wire cmdproc → barrier →
-> smem → load → mac_array → store → DRAM-TB into one top module and run a full
-> 32×32×32 matmul through pure Verilog, bit-exact vs golden. The "working chip"
-> milestone. Run `cd rtl/tb && make all_leaves` to re-verify everything first.
+> **▶ RESUME HERE (as of 2026-06-11, after PR #8):**
+> Phases 0–4 complete. **The whole chip works** — `chip_top.sv` runs a full
+> multi-tile matmul end-to-end through real Verilog, bit-exact vs golden.
+> **Score: 89 tests green (52 RTL + 37 Python), 8 PRs merged.**
+> **Next up = Phase 5: synthesis smoke** — Yosys elaboration (no latches),
+> then sky130 + ASAP7 first synth for area/timing baselines. Run
+> `cd rtl/tb && make all_leaves` to re-verify all 13 RTL units first.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
@@ -64,28 +64,26 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 - [x] `docs/DEVELOPMENT.md` — workflow, RTL/verification conventions, numeric contracts
 - [x] `docs/ENGINEERING.md` — honest status table + differentiators vs autogpu
 
-## Phase 4 — RTL integration  ← **NEXT**
-- [ ] `rtl/chip_top.sv` — instantiate cmdproc + barrier + smem + load +
-      mac_array + store; wire the point-to-point paths per docs/ARCHITECTURE.md:
-      - cmdproc.bar_* ↔ barrier; load.done/store.done/mma.done → barrier arrivals
-      - load.smem_wr → smem write port; smem read ports → mac_array a_tile/b_tile
-        (note: array latches full tiles at MMA start — chip_top must present the
-        A/B operand tiles from smem on the mma_start cycle; simplest v1 = a small
-        operand-fetch shim reading the two tiles from smem into the wide buses)
-      - store.drain_* ↔ mac_array drain port; store.gmem_wr → DRAM-TB
-      - load.gmem_rd ↔ DRAM-TB (1-cycle combinational read contract)
-- [ ] `rtl/chip_top_tb_top.sv` + behavioral DRAM model (cocotb)
-- [ ] e2e single-tile 32×32×32 matmul bit-exact vs golden (full size, real K=32)
-- [ ] Multi-tile + K-loop + REPEAT e2e (port pymodel/tests/test_e2e.py programs)
-- [ ] config.py → SV package generator (so chip_top uses MMA_M/N/K from one place)
-- [ ] 🎉 **Ads-grade README + demo assets + About/topics polish**
+## Phase 4 — RTL integration ✅ (2026-06-11, PR #8)
+- [x] `rtl/mma_unit.sv` — operand-fetch FSM (chose option (a)) + mac_array;
+      streams A/B tiles from SMEM into the array's wide ports, presents the
+      cmdproc's standard MMA interface. 2 tests (fetch+MMA+drain, accumulate)
+- [x] `rtl/chip_top.sv` — cmdproc + barrier + smem + load + mma_unit + store,
+      fully wired per docs/ARCHITECTURE.md; external pins = instr push + GMEM
+      read/write ports (behavioral DRAM in TB)
+- [x] e2e single-tile matmul, fp32 out — **bit-exact vs golden**
+- [x] e2e single-tile, fp8 out — bit-exact
+- [x] e2e **4-tile K-loop via REPEAT** with strided gmem loads — bit-exact
+- [x] **Pipeline-hazard fix in cmdproc**: engine `busy` rises one cycle after
+      a registered `start`; added per-engine issued-last-cycle guards
+      (ld_iss_d/mma_iss_d/st_iss_d) so the front-end can't double-issue into
+      an engine in that window
+- [ ] config.py → SV package generator (deferred; -G overrides suffice for now)
+- [ ] 🎉 **Ads-grade README + demo assets + About/topics polish** (Phase 5+)
 
-**Open design note for chip_top:** the mac_array currently takes full A/B
-tiles as wide ports latched at start. Real HW streams columns from smem during
-the K-loop. For Phase 4 v1, either (a) add an operand-fetch FSM that reads both
-tiles from smem into registers before pulsing mma_start, or (b) refactor
-mac_array to a column-streaming interface (smem read port per K-step). Option (b)
-is more hardware-faithful and better for Phase 6 hardening — decide at Phase 4 start.
+**Note:** went with operand-fetch option (a) — keeps the verified mac_array
+untouched. Column-streaming (option b) is a Phase 6 hardening refactor if the
+fetch latency hurts timing.
 
 ## Phase 5 — Synthesis smoke
 - [ ] Yosys elaboration clean (no inferred latches)
