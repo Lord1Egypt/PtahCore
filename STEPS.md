@@ -113,10 +113,18 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       (250 MHz target) + `flow/harden.sh` docker runner (PR #10)
 - [x] Solved WSL2 docker-credential-desktop.exe blocker → `DOCKER_CONFIG=/tmp/dockercfg`
       with `{}` config skips the Windows cred helper for public pulls
-- [ ] ⏳ Pull `openroad/orfs:latest` (large image, in progress) then
-      `flow/harden.sh mac_cell` → first real GDS, timing, DRC numbers
+- [x] Pulled `openroad/orfs:latest` (6.5 GB) + ran `flow/harden.sh mac_cell`
+      on REAL ASAP7 → synth + floorplan + placement clean (PR #11)
+- [x] First real numbers: mac_cell **833 µm²**, 49% util; **fails 250 MHz**
+      (WNS −2237 ps) — single-cycle fp32 mul→add→acc tops out ~160 MHz
+- [x] Failure log populated (HARDENING.md): VERILOG_DEFINES -D prefix, SDC
+      remove_from_collection, **CTS SIGILL (WSL2 CPU lacks AVX-class instr —
+      env blocker, stops CTS→route→GDS here)**
+- [ ] **Phase 6b: pipeline the MAC cell** (register between fp32 mul and add;
+      propagate latency through mac_array K-loop + pymodel + tests, keep
+      bit-exact) → then closes 250 MHz
+- [ ] Complete CTS→route→GDS on an AVX-capable host or native OpenROAD build
 - [ ] mac_cell tile: clean GDS, 0 DRC, timing closed at 250 MHz (honest)
-- [ ] FAILURES table population (capture every flow error once, in HARDENING.md)
 
 ## Phase 7 — Hardening: array + chip
 - [ ] Abutted row (1×32) with traveling clock

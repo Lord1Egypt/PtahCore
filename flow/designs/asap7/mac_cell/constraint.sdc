@@ -18,10 +18,11 @@ set_clock_uncertainty  0.10 [get_clocks clk]
 # I/O budgets: operands (a_f32/b_f32) and control arrive registered from
 # the row/column edge; drain_out feeds the STORE mux. Give 30% of the
 # period each side so the cell is characterised as a tile, not in
-# isolation.
+# isolation. (Data ports listed explicitly — OpenROAD's SDC reader has no
+# remove_from_collection, and clk must be excluded from input delay.)
 set io_delay [expr 0.30 * $clk_period]
-set_input_delay  -clock clk $io_delay [remove_from_collection [all_inputs] [get_ports clk]]
-set_output_delay -clock clk $io_delay [all_outputs]
+set_input_delay  -clock clk $io_delay [get_ports {en zero slot a_f32 b_f32 drain_slot}]
+set_output_delay -clock clk $io_delay [get_ports {drain_out}]
 
 # Reset is a slow, globally-distributed signal — exclude from timing.
 set_false_path -from [get_ports rst]

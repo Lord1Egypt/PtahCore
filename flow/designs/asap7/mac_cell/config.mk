@@ -18,7 +18,7 @@ export VERILOG_FILES = \
     $(PTAHCORE)/rtl/fp32_mul.sv \
     $(PTAHCORE)/rtl/fp32_add.sv \
     $(PTAHCORE)/rtl/mac_cell.sv
-export VERILOG_DEFINES = SYNTHESIS
+export VERILOG_DEFINES = -DSYNTHESIS
 
 export SDC_FILE = $(PTAHCORE)/flow/designs/asap7/mac_cell/constraint.sdc
 
