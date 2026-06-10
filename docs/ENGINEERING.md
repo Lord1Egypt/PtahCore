@@ -28,10 +28,12 @@ for both Python and SV.
 | 10 | Stretch: 64×64, multi-shape MMA | ⬜ |
 
 **Current state in one line:** the full machine runs end-to-end in the
-cycle-level Python model — single-tile and REPEAT-driven K-loop matmuls are
-bit-exact against the golden reference — and the RTL arithmetic leaves
-(fp8_decode, fp32_mul, fp32_add, mac_cell) are written with exhaustive cocotb
-suites pending first Verilator run.
+cycle-level Python model (bit-exact), and **9 RTL modules** are written and
+**verified bit-exact under Verilator** — the arithmetic leaves (fp8_decode,
+fp8_encode, fp32_mul, fp32_add, mac_cell) plus the memory/sync/engine layer
+(smem, barrier, load, store). 31 RTL cocotb tests + 37 Python tests, all
+green. Remaining for full chip: the MAC array slice and the cmdproc, then
+top-level integration.
 
 ## Differentiators vs. prior art
 
