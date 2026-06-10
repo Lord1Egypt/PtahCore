@@ -92,6 +92,15 @@ module cmdproc #(
     logic [3:0]  wait_bar;
     logic [NUM_BARRIERS-1:0] tracker;
 
+    // engine-issue guards: a freshly issued engine's `busy` only rises
+    // one cycle later (registered start → registered busy). Without this
+    // the front-end would issue a second op into the same engine in that
+    // window. We treat an engine as busy the cycle after we start it.
+    logic ld_iss_d, mma_iss_d, st_iss_d;
+    wire  ld_busy_e  = ld_busy  || ld_iss_d;
+    wire  mma_busy_e = mma_busy || mma_iss_d;
+    wire  st_busy_e  = st_busy  || st_iss_d;
+
     assign idle = fifo_empty && !waiting && !replaying && (cap_left == 0);
 
     // ── current instruction: replay body, else FIFO head ─────────────
@@ -137,9 +146,9 @@ module cmdproc #(
         issue = 1'b0;
         case (op)
             OP_BARINIT: issue = 1'b1;
-            OP_LOAD:    issue = !ld_busy;
-            OP_MMA:     issue = !mma_busy;
-            OP_STORE:   issue = !st_busy;
+            OP_LOAD:    issue = !ld_busy_e;
+            OP_MMA:     issue = !mma_busy_e;
+            OP_STORE:   issue = !st_busy_e;
             OP_WAIT:    issue = 1'b1;
             OP_REPEAT:  issue = 1'b0;   // handled specially
             default:    issue = 1'b1;
@@ -155,12 +164,17 @@ module cmdproc #(
         ld_start    <= 1'b0;
         mma_start   <= 1'b0;
         st_start    <= 1'b0;
+        // guards mirror the start strobes we set this cycle (default clear)
+        ld_iss_d    <= 1'b0;
+        mma_iss_d   <= 1'b0;
+        st_iss_d    <= 1'b0;
 
         if (rst) begin
             head <= 0; tail <= 0; count <= 0;
             cap_left <= 0; body_len <= 0; body_pos <= 0;
             replaying <= 1'b0; rep_count <= 0; rep_iter <= 0;
             waiting <= 1'b0; wait_bar <= 0; tracker <= '0;
+            ld_iss_d <= 1'b0; mma_iss_d <= 1'b0; st_iss_d <= 1'b0;
         end else begin
             logic pushed, popped;
             logic [BW:0] body_widx;
@@ -206,18 +220,19 @@ module cmdproc #(
                         bar_init_count <= a16; tracker[bar] <= 1'b0;
                     end
                     OP_LOAD: begin
-                        ld_start <= 1'b1; ld_bar <= bar;
+                        ld_start <= 1'b1; ld_iss_d <= 1'b1; ld_bar <= bar;
                         ld_gmem <= eff_gmem; ld_smem <= eff_smem;
                         ld_nbytes <= n32;
                         bar_tx_en <= 1'b1; bar_tx_bar <= bar; bar_tx_bytes <= n32;
                     end
                     OP_MMA: begin
-                        mma_start <= 1'b1; mma_a <= eff_a; mma_b <= eff_b;
+                        mma_start <= 1'b1; mma_iss_d <= 1'b1;
+                        mma_a <= eff_a; mma_b <= eff_b;
                         mma_slot <= slot; mma_accum <= accdt; mma_fmt <= fmt;
                         mma_bar <= bar;
                     end
                     OP_STORE: begin
-                        st_start <= 1'b1; st_bar <= bar;
+                        st_start <= 1'b1; st_iss_d <= 1'b1; st_bar <= bar;
                         st_gmem <= eff_gmem; st_slot <= slot; st_dtype <= accdt;
                     end
                     OP_WAIT: begin

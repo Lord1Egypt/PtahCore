@@ -19,7 +19,7 @@ for both Python and SV.
 | 1 | Golden fp8 model (e4m3 + e5m2) | ✅ done — 20 tests |
 | 2 | Cycle-level pymodel, e2e matmul | ✅ done — 37 tests, bit-exact |
 | 3 | RTL modules vs pymodel (cocotb) | ✅ done — 11 units, 45 tests |
-| 4 | Full RTL integration + e2e | ⬜ |
+| 4 | Full RTL integration + e2e | ✅ done — chip_top runs multi-tile matmul |
 | 5 | Synthesis smoke (sky130 → ASAP7) | ⬜ |
 | 6 | Hardening: leaf tiles | ⬜ |
 | 7 | Hardening: array + chip (traveling clock) | ⬜ |
@@ -27,13 +27,12 @@ for both Python and SV.
 | 9 | 2:4 structured sparsity | ⬜ |
 | 10 | Stretch: 64×64, multi-shape MMA | ⬜ |
 
-**Current state in one line:** every RTL module of the chip is written and
-**verified bit-exact under Verilator** — the arithmetic leaves (fp8_decode,
-fp8_encode, fp32_mul, fp32_add, mac_cell), the memory/sync/engine layer
-(smem, barrier, load, store), the **32×32 MAC array**, and the **cmdproc**
-(REPEAT + auto-phase WAIT). 45 RTL cocotb tests + 37 Python tests, all green.
-Remaining for a full chip: top-level `chip_top` integration (Phase 4) wiring
-all modules together and running the matmul through pure Verilog end to end.
+**Current state in one line:** **the whole chip works.** `chip_top.sv` wires
+every module together — cmdproc → barrier → smem → load → mma_unit (fetch +
+32×32 array) → store → DRAM — and runs a full multi-tile FP8 matmul end to
+end through real Verilog, **bit-exact against the golden model**, including a
+REPEAT-driven 4-tile K-loop. 52 RTL cocotb tests + 37 Python tests, all green.
+Next: synthesis (Yosys → sky130 → ASAP7) and 7nm hardening.
 
 ## Differentiators vs. prior art
 
