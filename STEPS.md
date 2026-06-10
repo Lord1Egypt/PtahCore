@@ -2,19 +2,19 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-## Phase 0 — Scaffold
+## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
 - [x] Write PLAN.md
-- [ ] Create GitHub repo (public) + About/topics
-- [ ] `config.py` — single source of truth (MMA_M/N/K=32, SMEM size, slots, FIFO depth)
-- [ ] `.github/workflows/ci.yml` — lint + pytest on every PR
-- [ ] `pyproject.toml` (uv, numpy, cocotb, pytest — minimal)
-- [ ] Placeholder README (full ads-grade README lands at Phase 4 when there's something to show)
+- [x] Create GitHub repo (public) + About/topics
+- [x] `config.py` — single source of truth (MMA_M/N/K=32, SMEM size, slots, FIFO depth)
+- [x] `.github/workflows/ci.yml` — lint + pytest on every PR
+- [x] `pyproject.toml` (uv, numpy, cocotb, pytest — minimal)
+- [x] Placeholder README (full ads-grade README lands at Phase 4 when there's something to show)
 
-## Phase 1 — Golden model
-- [ ] `golden/fp8.py` — e4m3 + e5m2 encode/decode (subnormals, NaN, saturation)
-- [ ] `golden/matmul_reference.py` — fp8×fp8→fp32 reference vs numpy
-- [ ] `golden/tests/` — exhaustive 256-value roundtrip + random matmul property tests
+## Phase 1 — Golden model ✅ (2026-06-10, PR #1 — done early with scaffold)
+- [x] `golden/fp8.py` — e4m3 + e5m2 encode/decode (subnormals, NaN, saturation)
+- [x] `golden/matmul_reference.py` — fp8×fp8→fp32 reference vs numpy
+- [x] `golden/tests/` — exhaustive 256-value roundtrip + random matmul property tests (20 tests green)
 
 ## Phase 2 — pymodel (cycle-level behavioral)
 - [ ] Module spec template (INPUTS/OUTPUTS/STATE/BEHAVIOR/INVARIANTS per module)
