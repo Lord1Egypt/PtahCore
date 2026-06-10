@@ -1,0 +1,18 @@
+[project]
+name = "ptahcore"
+version = "0.1.0"
+description = "PtahCore — open-source FP8 tensor accelerator, RTL to 7nm GDSII"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "cocotb>=1.9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["golden/tests"]
+pythonpath = ["."]
