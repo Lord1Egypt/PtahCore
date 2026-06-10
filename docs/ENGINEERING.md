@@ -18,7 +18,7 @@ for both Python and SV.
 | 0 | Scaffold: repo, config, CI | ✅ done |
 | 1 | Golden fp8 model (e4m3 + e5m2) | ✅ done — 20 tests |
 | 2 | Cycle-level pymodel, e2e matmul | ✅ done — 37 tests, bit-exact |
-| 3 | RTL leaves vs pymodel (cocotb) | 🔨 in progress |
+| 3 | RTL modules vs pymodel (cocotb) | ✅ done — 11 units, 45 tests |
 | 4 | Full RTL integration + e2e | ⬜ |
 | 5 | Synthesis smoke (sky130 → ASAP7) | ⬜ |
 | 6 | Hardening: leaf tiles | ⬜ |
@@ -27,13 +27,13 @@ for both Python and SV.
 | 9 | 2:4 structured sparsity | ⬜ |
 | 10 | Stretch: 64×64, multi-shape MMA | ⬜ |
 
-**Current state in one line:** the full machine runs end-to-end in the
-cycle-level Python model (bit-exact), and **9 RTL modules** are written and
+**Current state in one line:** every RTL module of the chip is written and
 **verified bit-exact under Verilator** — the arithmetic leaves (fp8_decode,
-fp8_encode, fp32_mul, fp32_add, mac_cell) plus the memory/sync/engine layer
-(smem, barrier, load, store). 31 RTL cocotb tests + 37 Python tests, all
-green. Remaining for full chip: the MAC array slice and the cmdproc, then
-top-level integration.
+fp8_encode, fp32_mul, fp32_add, mac_cell), the memory/sync/engine layer
+(smem, barrier, load, store), the **32×32 MAC array**, and the **cmdproc**
+(REPEAT + auto-phase WAIT). 45 RTL cocotb tests + 37 Python tests, all green.
+Remaining for a full chip: top-level `chip_top` integration (Phase 4) wiring
+all modules together and running the matmul through pure Verilog end to end.
 
 ## Differentiators vs. prior art
 
