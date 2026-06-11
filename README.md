@@ -2,7 +2,9 @@
 
 > An open-source **FP8 tensor accelerator** — SystemVerilog RTL → synthesis → place-and-route → **7nm GDSII**, on a 100% open-source toolchain. Named after Ptah, the Egyptian creator god and patron of craftsmen & architects.
 
-🟢 **Working in simulation + hardening on 7nm** — a full multi-tile FP8 matmul runs end-to-end through real SystemVerilog (`chip_top`), bit-exact against a golden numpy model, and the `mac_cell` tile **closes 250 MHz setup on the ASAP7 7nm PDK** (~2 ns critical path, 675 µm², bit-exact). Phase 6 of 10. Watch this repo: the fight with real silicon physics lands here as it happens.
+🟢 **First GDS is out** — a full multi-tile FP8 matmul runs end-to-end through real SystemVerilog (`chip_top`), bit-exact against a golden numpy model, and the `mac_cell` tile has a **complete, signoff-clean 7nm GDSII on ASAP7**: 250 MHz with +1928 ps setup / +13 ps hold slack (zero violations, zero masked), DRC clean, 750 µm². Phase 6 of 10 done. Watch this repo: the fight with real silicon physics lands here as it happens.
+
+<p align="center"><img src="docs/img/mac_cell_gds.webp" width="420" alt="mac_cell routed 7nm layout"><br><em>The routed mac_cell macro — RTL→GDSII on a laptop, 100% open tools (full story in <a href="docs/HARDENING.md">docs/HARDENING.md</a>)</em></p>
 
 ## Docs
 
