@@ -2,7 +2,7 @@
 
 > An open-source **FP8 tensor accelerator** — SystemVerilog RTL → synthesis → place-and-route → **7nm GDSII**, on a 100% open-source toolchain. Named after Ptah, the Egyptian creator god and patron of craftsmen & architects.
 
-🟢 **Working in simulation** — a full multi-tile FP8 matmul runs end-to-end through real SystemVerilog (`chip_top`), bit-exact against a golden numpy model. Phase 4 of 10 done; next is 7nm synthesis & hardening. Watch this repo: the fight with real silicon physics lands here as it happens.
+🟢 **Working in simulation + hardening on 7nm** — a full multi-tile FP8 matmul runs end-to-end through real SystemVerilog (`chip_top`), bit-exact against a golden numpy model, and the `mac_cell` tile **closes 250 MHz setup on the ASAP7 7nm PDK** (~2 ns critical path, 675 µm², bit-exact). Phase 6 of 10. Watch this repo: the fight with real silicon physics lands here as it happens.
 
 ## Docs
 

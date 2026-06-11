@@ -12,8 +12,7 @@ import sys
 from pathlib import Path
 
 import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import Timer, RisingEdge
+from cocotb.triggers import Timer
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -33,23 +32,9 @@ def _is_nan_bits(b: int) -> bool:
 
 
 async def _check(dut, a_bits: int, b_bits: int, want_bits: int, tag: str):
-    """Combinational check — used for fp32_add."""
     dut.a.value = a_bits
     dut.b.value = b_bits
     await Timer(1, "ns")
-    _assert_y(dut, want_bits, tag, a_bits, b_bits)
-
-
-async def _check_mul(dut, a_bits: int, b_bits: int, want_bits: int, tag: str):
-    """Clocked check — fp32_mul is a 2-stage pipeline (latency 1)."""
-    dut.a.value = a_bits
-    dut.b.value = b_bits
-    await RisingEdge(dut.clk)       # latch stage-1 product
-    await Timer(1, "ns")           # let stage-2 settle
-    _assert_y(dut, want_bits, tag, a_bits, b_bits)
-
-
-def _assert_y(dut, want_bits, tag, a_bits, b_bits):
     got = int(dut.y.value)
     if _is_nan_bits(want_bits):
         assert _is_nan_bits(got), f"{tag}: want NaN got {got:#010x}"
@@ -75,25 +60,23 @@ async def mul_fp8_pairs(dut):
     """All-pairs over a stratified sample of decoded fp8 values."""
     if "mul" not in dut._name:
         return
-    cocotb.start_soon(Clock(dut.clk, 2, "ns").start())
     vals = _finite_fp8_values()
     sample = vals[::9] + [0.0, 1.0, -1.0, 448.0, -448.0, 57344.0]
     for x, ybit in itertools.product(sample, repeat=2):
         want = np.float32(np.float32(x) * np.float32(ybit))
-        await _check_mul(dut, bits(x), bits(ybit), bits(want), "mul")
+        await _check(dut, bits(x), bits(ybit), bits(want), "mul")
 
 
 @cocotb.test()
 async def mul_specials(dut):
     if "mul" not in dut._name:
         return
-    cocotb.start_soon(Clock(dut.clk, 2, "ns").start())
     inf, nan = float("inf"), float("nan")
     cases = [(inf, 2.0), (2.0, -inf), (inf, inf), (inf, 0.0), (0.0, -inf),
              (nan, 1.0), (1.0, nan), (0.0, -0.0), (-0.0, -0.0)]
     for x, z in cases:
         want = np.float32(x) * np.float32(z)
-        await _check_mul(dut, bits(x), bits(z), bits(want), "mul-special")
+        await _check(dut, bits(x), bits(z), bits(want), "mul-special")
 
 
 @cocotb.test()

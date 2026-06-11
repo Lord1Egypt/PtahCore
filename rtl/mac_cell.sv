@@ -41,29 +41,40 @@ module mac_cell #(
 
     logic [31:0] acc [TMEM_SLOTS];
 
-    // ── stages 1–2: pipelined multiply (latency 1) ───────────────────
-    // fp32_mul registers the 24×24 product internally, so `prod` is valid
-    // one cycle after a_f32/b_f32 and the long multiply no longer shares a
-    // cycle with the adder.
-    logic [31:0] prod;                                 // valid at N+1
-    fp32_mul u_mul (.clk(clk), .a(a_f32), .b(b_f32), .y(prod));
+    // ── stage 1: multiply (combinational), register the FULL product ──
+    // The whole fp32 multiply (24×24 + normalize + round) is one stage and
+    // its result is registered, so stage 2 is the accumulate ALONE. This
+    // is the balanced split: post-place the multiply is < the adder, so the
+    // adder is the lone critical path — exactly what we want to attack.
+    // (Registering the raw product instead would drag the mul's normalize
+    // into the add stage and make it the longer one — measured worse.)
+    logic [31:0] prod;
+    fp32_mul u_mul (.a(a_f32), .b(b_f32), .y(prod));
 
-    // Control is delayed one cycle to line up with `prod` (operand→acc
-    // latency = 2: one cycle in the multiply, one in the accumulate).
+    logic [31:0]      prod_q;
     logic             en_q, zero_q;
     logic [SLOT_W-1:0] slot_q;
     always_ff @(posedge clk) begin
         if (rst) begin
-            en_q <= 1'b0; zero_q <= 1'b0; slot_q <= '0;
+            prod_q <= 32'h0; en_q <= 1'b0; zero_q <= 1'b0; slot_q <= '0;
         end else begin
-            en_q <= en; zero_q <= zero; slot_q <= slot;
+            prod_q <= prod;
+            en_q   <= en;
+            zero_q <= zero;
+            slot_q <= slot;
         end
     end
 
-    // ── stage 3: accumulate the product (combinational add → register) ─
+    // ── stage 2: accumulate the registered product ───────────────────
+    // acc[slot] += prod_q. This is a LOOP-CARRIED dependency (each K-step
+    // reads the accumulator the previous step wrote), so it cannot be
+    // pipelined: a dependent accumulate chain runs no faster than one fp32
+    // add. That single add (~5.3 ns at ASAP7) is the cell's clock floor.
+    // Reaching 250 MHz needs a different accumulator (Kulisch fixed-point);
+    // see docs/HARDENING.md.
     logic [31:0] acc_in, sum;
     assign acc_in = zero_q ? 32'h0 : acc[slot_q];
-    fp32_add u_add (.a(acc_in), .b(prod), .y(sum));
+    fp32_add u_add (.a(acc_in), .b(prod_q), .y(sum));
 
     always_ff @(posedge clk) begin
         if (rst) begin
