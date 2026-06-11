@@ -35,13 +35,28 @@ enters its west edge `i × δs` after row 0's, where **δs ≈ the in-context
   (`32·δs`). The southward clock gap `(32−i)·δs` cancels the chain
   `(31−i)·δd` when δd ≈ δs — the eastward trick, rotated 90°.
 
-**Hold rule (vertical wave matching, TILE_SPEC §3 rotated):** the
-southbound data arcs must not outrun the southbound clock stagger:
-`δd ≥ δs` and `δb ≥ δs` at the fast corner. δs is OUR knob (it is the
-spine's per-row delay), so it is set *at or below* the measured
-fast-corner vertical arcs. If the tile ever re-hardens, the vertical
-feedthroughs get the same `set_min_delay` floor the horizontal ones got
-in rev B.
+**Hold rule (vertical wave matching — learned per-bit in grid
+attempts 1–2, HARDENING.md):** every feedthrough BIT marches at its own
+consistent per-hop rate, and the fast corners span ~31–95 ps/hop — no
+single stagger can wave-match a bus with a 3× internal spread over 31
+hops, and `set_min_delay` floors inside the tile are a measured no-op
+(port-to-port paths have no clocked endpoint; no repair stage services
+them — the rev-B/C libs are byte-identical). The contract is therefore
+**per-bit pre-delay at the grid boundary** (generated from the
+characterised lib by `flow/designs/asap7/mac_grid/gen_constraints.py`):
+
+- west input bit s: `io(s) = base + (δe − δ_min(s))·(N−1) + guard` —
+  the same uniform pre-delay the row's hold repair built physically
+  (~1.9 ns of buffers before tile 0), made explicit and per-bit;
+- north B bit b: `io(b) = base + (δs − δb_min(b))·(M−1) + guard`,
+  plus `j·δe` per column;
+- drain capture `clk_s`: an **early spine tap** (≈1.94 ns, not the
+  2.87 ns spine end) — at or before the earliest per-bit chain
+  arrival, so every row is hold-positive by construction and the
+  settled-bus multicycle absorbs all lateness on the setup side.
+
+Validated on the placed 1024-macro DB with propagated clocks:
+setup +1139 ps / hold +78 ps, TNS 0 both.
 
 ## 2. Who builds the spine
 

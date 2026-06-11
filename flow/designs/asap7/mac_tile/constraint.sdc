@@ -42,15 +42,14 @@ set_min_delay $ft_min -from [get_ports drain_slot_in] -to [get_ports drain_slot_
 set_min_delay $ft_min -from [get_ports row_hit_in]    -to [get_ports row_hit_out]
 set_min_delay $ft_min -from [get_ports a_in]          -to [get_ports a_out]
 
-# Rev C — the SAME rule for the SOUTHBOUND waves (7c, ARRAY_SPEC §1):
-# rows stack with the clock staggered δs≈85 ps/row, so the vertical
-# feedthroughs must not outrun it either. Measured in the first grid
-# attempt: b_in→b_out 88.9 ps (naturally fine), drain_n_in→drain_s_out
-# only 52.6 ps (a bare mux — far rows hold-violated at the south
-# register by ~−965 ps). Floor both; setup absorbs lag, hold can't
-# tolerate lead.
-set_min_delay $ft_min -from [get_ports b_in]          -to [get_ports b_out]
-set_min_delay $ft_min -from [get_ports drain_n_in]    -to [get_ports drain_s_out]
+# (Rev C tried the same floors on the vertical feedthroughs — measured
+# no-op: port-to-port set_min_delay has no clocked endpoint, so no
+# repair stage inserts delay for it; the rev-B floors above also never
+# changed the netlist (libs byte-identical). The west wave actually
+# closed at ROW level via parent-side pre-delay buffers, and the grid
+# can't buffer between abutted macros at all — so vertical wave safety
+# is a PER-BIT delivery contract at the grid boundary instead:
+# flow/designs/asap7/mac_grid/gen_constraints.py.)
 
 # Reset is a slow, globally-distributed signal — exclude from timing
 # (rst_out is its feedthrough continuation).
