@@ -8,7 +8,7 @@
 
 read_verilog -sv -DSYNTHESIS \
     rtl/fp8_decode.sv rtl/fp8_encode.sv rtl/fp32_mul.sv rtl/fp32_add.sv \
-    rtl/mac_cell.sv rtl/mac_array.sv rtl/smem.sv rtl/barrier.sv \
+    rtl/mac_cell.sv rtl/mac_row.sv rtl/mac_array.sv rtl/smem.sv rtl/barrier.sv \
     rtl/load.sv rtl/store.sv rtl/cmdproc.sv rtl/mma_unit.sv rtl/chip_top.sv
 
 # Shrink the array to 4x4x8 so generic synthesis stays tractable; the logic
