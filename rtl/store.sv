@@ -1,12 +1,15 @@
 // store — ASYNC drain engine, TMEM slot → gmem. Twin: pymodel/store.py.
 //
 // One fp32 element per cycle from the array's drain port. The drain is
-// REGISTERED at the row boundary (traveling-clock return path — see
-// mac_row.sv), so drain_data answers the drain_idx of the previous
-// cycle: the engine runs a request stage (idx 0..ELEMS-1) and a
-// write-back stage one cycle behind it (throughput unchanged, one
-// extra cycle of latency per STORE). dtype=0 writes 4-byte fp32;
-// dtype=1 converts through fp8_encode (RNE, saturating e4m3), 1 byte.
+// REGISTERED at the grid's south boundary (traveling-clock return path
+// — see mac_grid.sv), so drain_data answers the drain_idx of the
+// previous cycle: the engine runs a request stage (idx 0..ELEMS-1) and
+// a write-back stage one cycle behind it. At each drain-row change
+// (every N elements, and at burst start) the engine inserts ONE settle
+// bubble so the grid's southbound chain is a settled bus before its
+// first capture (ARRAY_SPEC §3) — M extra cycles per burst. dtype=0
+// writes 4-byte fp32; dtype=1 converts through fp8_encode (RNE,
+// saturating e4m3), 1 byte.
 //
 // PtahCore's flagship ISA improvement: completion is a barrier arrival
 // (done pulse), never a front-end stall — epilogue overlap is free.
@@ -45,14 +48,27 @@ module store #(
 );
 
     localparam int ELEMS = M * N;
+    localparam int NW = $clog2(N);
 
     logic [3:0]         bar_q;
     logic [GMEM_AW-1:0] g_q;
     logic               dtype_q;
     logic [$clog2(ELEMS):0] idx_q;              // one extra bit for == ELEMS
     logic               req_active;             // request stage running
+    logic               settled_q;              // current drain row has settled
     logic               wr_v_q;                 // write-back stage valid
     logic [$clog2(ELEMS):0] wr_idx_q;           // index the data answers
+
+    // Row-change settle bubble (ARRAY_SPEC §3): when the drain row index
+    // changes (every N elements, and at burst start), the grid's
+    // southbound chain needs a full extra cycle to settle before the
+    // first capture of the new row — that bubble is what makes the
+    // array's multicycle drain constraint RTL-enforced instead of
+    // waived. drain_idx holds the row's first element for one dead
+    // request cycle; the write-back stage ignores it. +M cycles per
+    // burst (~3%).
+    logic row_bubble;
+    assign row_bubble = req_active && (idx_q[NW-1:0] == '0) && !settled_q;
 
     logic [7:0] enc8;
     fp8_encode u_enc (.in32(drain_data), .out8(enc8));
@@ -71,7 +87,8 @@ module store #(
             done_bar <= 4'd0;
             bar_q <= 4'd0; g_q <= '0; dtype_q <= 1'b0; idx_q <= '0;
             drain_slot <= '0;
-            req_active <= 1'b0; wr_v_q <= 1'b0; wr_idx_q <= '0;
+            req_active <= 1'b0; settled_q <= 1'b0;
+            wr_v_q <= 1'b0; wr_idx_q <= '0;
         end else begin
             if (start) begin
 `ifndef SYNTHESIS
@@ -84,11 +101,13 @@ module store #(
                 drain_slot<= start_slot;
                 idx_q     <= '0;
                 req_active<= 1'b1;
+                settled_q <= 1'b0;
                 wr_v_q    <= 1'b0;
             end else if (busy) begin
                 // write-back stage: the registered drain answers last
-                // cycle's request next cycle
-                wr_v_q   <= req_active;
+                // cycle's request next cycle (settle bubbles are not
+                // requests)
+                wr_v_q   <= req_active && !row_bubble;
                 wr_idx_q <= idx_q;
                 if (wr_v_q && wr_idx_q == ($clog2(ELEMS)+1)'(ELEMS - 1)) begin
                     busy     <= 1'b0;
@@ -98,9 +117,15 @@ module store #(
                 end
                 // request stage
                 if (req_active) begin
-                    idx_q <= idx_q + 1'b1;
-                    if (idx_q == ($clog2(ELEMS)+1)'(ELEMS - 1)) begin
-                        req_active <= 1'b0;
+                    if (row_bubble) begin
+                        settled_q <= 1'b1;   // hold idx one extra cycle
+                    end else begin
+                        idx_q <= idx_q + 1'b1;
+                        if (idx_q[NW-1:0] == {NW{1'b1}})
+                            settled_q <= 1'b0;   // next idx starts a new row
+                        if (idx_q == ($clog2(ELEMS)+1)'(ELEMS - 1)) begin
+                            req_active <= 1'b0;
+                        end
                     end
                 end
             end
