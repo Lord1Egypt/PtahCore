@@ -94,11 +94,14 @@ def main():
             if round(val * 1e6) % round(p * 1e6):
                 fail(f"A3 outline {dim} {val} not a multiple of pitch {p}")
 
-    # A1 — exact grid positions
+    # A1 — exact grid positions. Geometric row index r counts from the
+    # BOTTOM (y grows up); the grid floorplan puts RTL row 0 at the TOP
+    # (B enters from the north die edge — gen_floorplan.py), so the
+    # instance at geometric row r is row[rows-1-r].
     def inst_name(r, c):
-        # row top uses col[c].u_tile; array will use row[r].col[c].u_tile
+        # row top uses col[c].u_tile; array uses row[i].col[c].u_tile
         return (f"col\\[{c}\\].u_tile" if args.rows == 1
-                else f"row\\[{r}\\].col\\[{c}\\].u_tile")
+                else f"row\\[{args.rows - 1 - r}\\].col\\[{c}\\].u_tile")
 
     grid = {}
     for r in range(args.rows):
