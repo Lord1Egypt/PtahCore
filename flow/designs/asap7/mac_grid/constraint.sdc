@@ -19,7 +19,11 @@ set clk_period 4000
 set M 32
 set N 32
 set src 150
-set ds 150      ;# southward stagger: ≤ fast corner of b/drain arcs
+set ds 85       ;# southward stagger = the rev-C vertical feedthrough floor
+                 # (measured in-context: b 88.9, drain floored 52.6→85;
+                 # δs=150 was the first attempt — far-row drain led its
+                 # capture clock by ~2.7 ns, CTS hold repair hit the
+                 # buffer cap, RSZ-0060)
 set de 82.34    ;# eastward clk arc, measured in-context (7b-3)
 
 for {set i 0} {$i < $M} {incr i} {
