@@ -2,8 +2,9 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, after Phase 7a):**
-> Phases 0–6 + 7a complete. **Second GDS is out — the 1×32 row**, first
+> **▶ RESUME HERE (as of 2026-06-11, after Phase 7b-1):**
+> Phases 0–6 + 7a + 7b-1 (tile-boundary RTL) complete.
+> **Second GDS is out — the 1×32 row**, first
 > hierarchical build: 32 `mac_cell` hard macros (ORFS BLOCKS flow) on a
 > deterministic pitch, setup **+386 ps** / hold **+438 ps** @ 250 MHz,
 > 0 setup/hold violations, **DRC clean**, 66,284 µm² @ 56% util (3 max-slew
@@ -11,9 +12,10 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 > 7b's re-layout). Key trap fixed: virtual-clock latency must be `-source`
 > or ORFS's post-CTS `set_propagated_clock` discards it (phantom −669 ps
 > hold wall). Runs need `ORFS_MAKE_ARGS='NUM_CORES=6'` on this 7 GB WSL2 VM.
-> **Score: 91 tests green (54 RTL + 37 Python), 14 PRs merged.**
-> **Next — Phase 7b:** traveling clock + true edge-pin abutment for the row
-> (docs/TILE_SPEC.md), then 32×32 array, then chip_top.
+> **Score: 94 tests green (57 RTL + 37 Python), 15 PRs merged.**
+> **Next — Phase 7b-2/3:** harden mac_tile with edge pin constraints, then
+> the abutted 1×32 row with the traveling clock (docs/TILE_SPEC.md), then
+> 32×32 array, then chip_top.
 > Re-verify RTL: `cd rtl/tb && make all_leaves`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
@@ -161,8 +163,20 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       (phantom −669 ps hold wall, CTS buffer-cap death)
 - [x] vclk honesty check exercised: model tightened 1150 → 750 ps to match
       measured insertion (~710 ps), hold re-closed ~400 ps harder
-- [ ] Phase 7b: row with **traveling clock** + true edge-pin abutment
-      (TILE_SPEC contract: clk west→east, fixed outline, edge power)
+- [x] **Phase 7b-1: tile-boundary RTL** (2026-06-11) — `rtl/mac_tile.sv`
+      wraps the verified mac_cell with the TILE_SPEC contract: west-in /
+      east-out feedthroughs (clk, rst, en/zero/slot/drain_slot, row_hit, A),
+      north-in / south-out (B column broadcast, row_hit-selected vertical
+      drain chain — designed now so the tile never re-hardens when rows
+      stack). mac_row = pure west→east tile chain; mac_array/mma_unit/
+      chip_top untouched. Bit-exact: **94 tests** (57 RTL + 37 Python),
+      3 new tile TBs (feedthroughs, drain chain select, wrapped-core MAC)
+- [ ] Phase 7b-2: harden mac_tile with edge pin constraints (clk_in west /
+      clk_out east same y, A/ctrl west→east, B+drain north→south, fixed
+      outline) + characterised clk_in→clk_out insertion matched to the data
+      feedthrough delay
+- [ ] Phase 7b-3: abutted 1×32 row from 32 mac_tile macros — no row CTS,
+      traveling clock through the chain, timing closed honestly
 - [ ] Full 32×32 array GDS
 - [ ] chip_top GDS — **timing closed honestly, zero masked hold violations**
 - [ ] 2D/3D layout viewer deployed (GDS → web)

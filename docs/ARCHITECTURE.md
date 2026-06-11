@@ -135,6 +135,8 @@ If BEHAVIOR needs more than ~10 rules, the module is doing too much — split it
 | RTL | `rtl/fp8_decode.sv` | comb. fp8→fp32, both formats |
 | RTL | `rtl/fp32_mul.sv`, `fp32_add.sv` | IEEE-754 RNE arithmetic |
 | RTL | `rtl/mac_cell.sv` | MAC leaf + TMEM slots |
+| RTL | `rtl/mac_tile.sv` | abutment tile: mac_cell + TILE_SPEC boundary (feedthroughs, traveling clock, drain chain) |
+| RTL | `rtl/mac_row.sv` | 1×N west→east chain of mac_tiles |
 | RTL | `rtl/tb/` | cocotb suites vs pymodel/numpy |
 
 ## 8. Parameters
