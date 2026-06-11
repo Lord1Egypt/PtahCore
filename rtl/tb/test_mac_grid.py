@@ -66,6 +66,7 @@ async def _reset(dut):
     dut.row_hit_v.value = 0
     dut.a_v.value = 0
     dut.b_n_flat.value = 0
+    dut.drain_n_flat.value = 0       # tied low by the parent
     dut.drain_col_sel.value = 0
     await RisingEdge(dut.clk_s)
     await RisingEdge(dut.clk_s)

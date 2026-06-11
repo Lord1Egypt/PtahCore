@@ -86,3 +86,8 @@ set_multicycle_path 1 -hold  -through [get_pins $chain_pins]
 
 # Reset is a slow, globally-distributed signal — exclude from timing.
 set_false_path -from [get_ports "rst_v\[*\]"]
+
+# Row 0's drain_n_in is tied LOW at the parent (a real constant, not a
+# toggling signal -- see mac_grid.sv port comment). Excluding it mirrors
+# the RTL tie; it is not a waiver of a live path.
+set_false_path -from [get_ports "drain_n_flat\[*\]"]
