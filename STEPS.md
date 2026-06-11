@@ -2,26 +2,22 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, Phase 7c-3 RUNNING, branch
-> `feat/phase7c3-grid-harden`):** PR #19 MERGED (19 PRs) = 7c-1 RTL +
-> 7c-2 flow design. On this branch since: flow/report_clock_table.py
-> (per-tile clock-arrival honesty check — VALIDATED on 7b-3 row: exact
-> +82.34 ps/tile, 32 tiles monotonic) + drain_n_flat made a north-edge
-> port (tie cells can't cross the tile sea; SDC false-path, grid 3/3 +
-> array 4/4 + elab green). **The grid harden is RUNNING detached:**
-> `setsid nohup flow/harden_grid.sh` → log /tmp/grid_harden.log
-> (block+abstract+clk-arc patch DONE; stage 3 = 1024-macro mac_grid
-> P&R in progress, NUM_CORES=6, expect hours). If dead after /clear:
-> check `tail /tmp/grid_harden.log`, `docker ps`; results land in
-> flow/{results,reports,logs}/asap7/mac_grid/base/. After it finishes:
-> 6_finish.rpt (setup/hold/slew), 5_route_drc.rpt (empty=clean), then
+> **▶ RESUME HERE (as of 2026-06-11 ~22:30, Phase 7c-3 attempt 2 RUNNING,
+> branch `feat/phase7c3-grid-harden`):** First grid attempt FAILED at CTS
+> (RSZ-0060) — root cause MEASURED and fixed: southbound drain arc is
+> 52.6 ps/row vs B 88.9 vs my δs=150 guess → tile **rev C** (vertical
+> set_min_delay 85 floors) + grid δs=85; full story in HARDENING.md
+> failure log. Artifacts wiped, **attempt 2 running detached**: log
+> /tmp/grid_harden2.log (tile rev-C rebuild → abstract → clk-arc patch
+> → 1024-macro grid). If dead after /clear: `tail /tmp/grid_harden2.log`,
+> `docker ps`. After success: 6_finish.rpt + 5_route_drc.rpt, then
 > `python3 flow/check_abutment.py --def flow/results/asap7/mac_grid/base/6_final.def
 > --lef flow/results/asap7/mac_grid_mac_tile/base/mac_tile.lef --cols 32
 > --rows 32 --x0 2.16 --y0 12.96` and
 > `python3 flow/report_clock_table.py --design mac_grid --cols 32 --rows 32`
-> (arrivals must grow ~δe/col AND ~δs/row; δs=150 in SDC is an INITIAL
-> GUESS — tune to measured southbound arcs + re-run if hold/setup
-> complains). Then HARDENING.md + STEPS results, docs/img renders, PR.
+> (arrivals must grow ~85/row + ~82/col). Debug recipe that found the
+> waves: OpenSTA on 3_5_place_dp.odb + 3_place.sdc (see HARDENING.md).
+> Then HARDENING.md results section, STEPS, docs/img renders, PR.
 > Re-verify RTL: `cd rtl/tb && make all_leaves`; Python: `pytest golden pymodel -q`.
 >
 > *(previous checkpoint, after Phase 7b-3):*
