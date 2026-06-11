@@ -2,23 +2,24 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11 ~22:30, Phase 7c-3 attempt 2 RUNNING,
-> branch `feat/phase7c3-grid-harden`):** First grid attempt FAILED at CTS
-> (RSZ-0060) — root cause MEASURED and fixed: southbound drain arc is
-> 52.6 ps/row vs B 88.9 vs my δs=150 guess → tile **rev C** (vertical
-> set_min_delay 85 floors) + grid δs=85; full story in HARDENING.md
-> failure log. Artifacts wiped, **attempt 2 running detached**: log
-> /tmp/grid_harden2.log (tile rev-C rebuild → abstract → clk-arc patch
-> → 1024-macro grid). If dead after /clear: `tail /tmp/grid_harden2.log`,
-> `docker ps`. After success: 6_finish.rpt + 5_route_drc.rpt, then
-> `python3 flow/check_abutment.py --def flow/results/asap7/mac_grid/base/6_final.def
-> --lef flow/results/asap7/mac_grid_mac_tile/base/mac_tile.lef --cols 32
-> --rows 32 --x0 2.16 --y0 12.96` and
-> `python3 flow/report_clock_table.py --design mac_grid --cols 32 --rows 32`
-> (arrivals must grow ~85/row + ~82/col). Debug recipe that found the
-> waves: OpenSTA on 3_5_place_dp.odb + 3_place.sdc (see HARDENING.md).
-> Then HARDENING.md results section, STEPS, docs/img renders, PR.
-> Re-verify RTL: `cd rtl/tb && make all_leaves`; Python: `pytest golden pymodel -q`.
+> **▶ RESUME HERE (as of 2026-06-12 ~00:15, Phase 7c-3 attempt 3 RUNNING,
+> branch `feat/phase7c3-grid-harden`):** THE CONTRACT CLOSES. Attempts
+> 1–2 story (HARDENING.md): single-δs staggering can't wave-match buses
+> with 3× per-bit arc spread, and tile-internal set_min_delay floors are
+> a measured NO-OP (rev-B/C libs byte-identical; the 7b-3 row really
+> closed via parent-side pre-delay buffers). Fix = PER-BIT pre-delay
+> interface contracts + early-spine-tap drain capture, generated from
+> the lib by flow/designs/asap7/mac_grid/gen_constraints.py →
+> constraint.sdc (regenerate after any tile re-char). **Validated on the
+> attempt-2 placed DB, propagated clocks: setup +1139 / hold +78, TNS 0
+> both.** Attempt 3 running detached: /tmp/grid_harden3.log (tile
+> rebuilds once — comment-only SDC change — then the grid).
+> Offline SDC iteration loop (minutes, no flow): docker STA vs
+> 3_5_place_dp.odb — see /tmp/val2.tcl pattern or HARDENING.md.
+> After success: 6_finish.rpt + 5_route_drc.rpt + check_abutment
+> (--rows 32 --x0 2.16 --y0 12.96) + report_clock_table (--rows 32;
+> arrivals ~85/row + ~82.34/col) + HARDENING.md results + docs/img +
+> PR. Re-verify RTL: `cd rtl/tb && make all_leaves`; `pytest golden pymodel -q`.
 >
 > *(previous checkpoint, after Phase 7b-3):*
 > Phases 0–7b complete — **four GDS out**: mac_cell, hierarchical row,
