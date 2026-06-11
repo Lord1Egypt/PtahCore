@@ -2,15 +2,16 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, after PR #8):**
-> Phases 0–4 complete. **The whole chip works** — `chip_top.sv` runs a full
-> multi-tile matmul end-to-end through real Verilog, bit-exact vs golden.
-> **Score: 89 tests green (52 RTL + 37 Python), 8 PRs merged.**
-> **Phase 6 status:** mac_cell **closes 250 MHz setup on ASAP7** (+1994 ps,
-> 675 µm², ~500 MHz capable), bit-exact. Synth→floorplan→place run via
-> `flow/harden.sh mac_cell`. **Next:** finish CTS→route→GDS (needs an
-> AVX-capable host / native OpenROAD — WSL2 SIGILLs TritonCTS), then harden the
-> row → 32×32 array → chip_top. Re-verify RTL: `cd rtl/tb && make all_leaves`.
+> **▶ RESUME HERE (as of 2026-06-11, after PR #14):**
+> Phases 0–6 complete. **First GDS is out**: mac_cell RTL→GDSII on ASAP7,
+> signoff clean — setup **+1928 ps** @ 250 MHz, hold **+13 ps** (0 violations,
+> real margin), **DRC clean**, 750 µm² @ 44% util. The old "needs an AVX host"
+> blocker was a misdiagnosis: the SIGILL was the image's `kepler-formal` LEC
+> binary (AVX-512), not TritonCTS — `LEC_CHECK=0` unblocks the whole flow on
+> WSL2 (~6 min/run). **Score: 89 tests green, 14 PRs merged.**
+> **Next — Phase 7:** harden the 1×N abutted row (traveling clock, see
+> docs/TILE_SPEC.md), then 32×32 array, then chip_top.
+> Re-verify RTL: `cd rtl/tb && make all_leaves`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
@@ -102,7 +103,7 @@ fetch latency hurts timing.
 gate-mapped — it's an SRAM macro at hardening, and expanding it to FFs OOM-ed
 the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
 
-## Phase 6 — Hardening: leaves  ← **IN PROGRESS**
+## Phase 6 — Hardening: leaves ✅ (2026-06-11, PRs #10–#14 — **first GDS**)
 - [x] `docs/TILE_SPEC.md` — abutment boundary contract (outline, edge power,
       opposing-edge clock, per-edge signal pins, .lib characterisation) (PR #10)
 - [x] `docs/INVARIANTS.md` — machine-checkable build/RTL invariants; B4 bans
@@ -128,10 +129,19 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       unit bug; the design was always fine.
 - [x] Reverted the internal-mul split (registering raw product measured worse);
       final cell = combinational fp32_mul, register full product, comb. add
-- [ ] Complete CTS→route→GDS on an AVX-capable host / native OpenROAD (WSL2
-      SIGILL blocks TritonCTS here); fixes the 128 pre-CTS hold violations
-- [ ] Harden the 1×N abutted row, then the 32×32 array, then chip_top
-- [ ] (Phase 7 stretch, only if pushing past ~500 MHz) Kulisch fixed-point
+- [x] **Phase 6d: SIGILL root-caused + first GDS** (PR #14) — the crash was
+      never TritonCTS: CTS + hold repair had already completed in the log.
+      It was `run_lec_test` exec-ing the image's `kepler-formal` LEC binary
+      (needs AVX-512; this host has AVX2). `LEC_CHECK = 0` skips it
+      (equivalence already covered by the bit-exact cocotb suite) → full
+      CTS→route→GDS runs fine on WSL2, ~6 min end-to-end
+- [x] Hold closed honestly: default `HOLD_SLACK_MARGIN=0` left 2 post-route
+      paths at −1.11 ps → set `+15` (positive margin = MORE slack demanded,
+      the opposite of masking) → **0 hold violations, worst +13.01 ps**
+- [x] **`mac_cell` GDS complete, signoff clean**: setup +1928 ps @ 250 MHz,
+      hold +13 ps, 0 slew/cap/fanout violations, **DRC clean**, 750 µm²
+      @ 44% util, ~480 MHz capable. Layout renders in docs/img/
+- [ ] (Phase 7 stretch, only if pushing past ~480 MHz) Kulisch fixed-point
       accumulator and/or width-matched fp8 multiplier
 
 ## Phase 7 — Hardening: array + chip
