@@ -93,7 +93,8 @@ async def _store_run(dut, tile_f32, dtype):
     writes = {}
     flat = tile_f32.ravel()
     prev_idx = None                  # registered drain: answers last request
-    for _ in range(len(flat) + 4):
+    # + one settle bubble per drain row (drain_idx held, no write)
+    for _ in range(len(flat) + tile_f32.shape[0] + 4):
         await Timer(0)               # post-edge combinational settle
         idx = int(dut.drain_idx.value)
         assert int(dut.drain_slot.value) == 1

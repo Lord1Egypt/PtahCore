@@ -57,9 +57,11 @@ def test_store_fp32_async_arrival():
     while st.busy:
         st.tick()
         cycles += 1
-    assert cycles == config.MMA_M * config.MMA_N   # 1 elem/cycle
+    elems = config.MMA_M * config.MMA_N
+    # 1 elem/cycle + one settle bubble per drain row (ARRAY_SPEC §3)
+    assert cycles == elems + config.MMA_M
     assert b.phase(2) == 1                   # arrival on completion
-    out = np.frombuffer(g.read(8192, cycles * 4), dtype="<f4")
+    out = np.frombuffer(g.read(8192, elems * 4), dtype="<f4")
     np.testing.assert_array_equal(out, arr.tmem[:, :, 1].ravel())
 
 

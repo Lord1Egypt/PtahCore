@@ -9,7 +9,8 @@
 //
 // The 1024 accumulators live inside the mac_cell leaves (distributed
 // TMEM). STORE drains them one element per cycle through drain_idx →
-// drain_data (combinational mux over the grid, row-major).
+// drain_data (row-major; the grid's southbound drain chain + registered
+// south strip — see mac_grid.sv / docs/ARRAY_SPEC.md).
 
 `default_nettype none
 
@@ -89,31 +90,41 @@ module mac_array #(
 
     // drain_idx is row-major (i*N + j); N is a power of two, so the low
     // $clog2(N) bits select the column inside a row and the high bits
-    // select the row — the same mux the flat grid had, split in two.
-    // Rows REGISTER their drain (see mac_row — traveling-clock return
-    // path), so the row-select bits are delayed one cycle to stay
-    // coherent: drain_data answers the drain_idx of the PREVIOUS cycle.
+    // decode to the grid's per-row row_hit (the tiles' southbound drain
+    // chain delivers the selected row to the south strip). The grid
+    // REGISTERS the drain at its south boundary (traveling-clock return
+    // path — see mac_grid), so drain_data answers the drain_idx of the
+    // PREVIOUS cycle, exactly as the per-row register did before 7c.
     localparam int NW = $clog2(N);
-    logic [31:0] drain_row [M];
-    generate
-        for (gi = 0; gi < M; gi++) begin : row
-            mac_row #(.N(N), .TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W)) u_row (
-                .clk(clk), .rst(rst),
-                .en(cell_en), .zero(cell_zero), .slot(slot_q),
-                .a_f32(a_f32[gi]),
-                .b_f32_flat(b_bus),
-                .drain_slot(drain_slot),
-                .drain_idx(drain_idx[NW-1:0]),
-                .drain_out(drain_row[gi])
-            );
-        end
-    endgenerate
-
-    logic [$clog2(M*N)-1-NW:0] drain_row_sel_q;
-    always_ff @(posedge clk) begin
-        drain_row_sel_q <= drain_idx[$clog2(M*N)-1:NW];
+    logic [M-1:0] row_hit;
+    always_comb begin
+        for (int i = 0; i < M; i++)
+            row_hit[i] = (drain_idx[$clog2(M*N)-1:NW] == ($clog2(M*N)-NW)'(i));
     end
-    assign drain_data = drain_row[drain_row_sel_q];
+
+    // Per-row west buses: in sim every row gets the same clock and the
+    // same control in the same cycle (the chip-level spine stagger is a
+    // physical-delay contract, not a behavioral one — ARRAY_SPEC §2).
+    logic [M*32-1:0] a_bus;
+    always_comb begin
+        for (int i = 0; i < M; i++)
+            a_bus[i*32 +: 32] = a_f32[i];
+    end
+
+    mac_grid #(.M(M), .N(N), .TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W)) u_grid (
+        .clk_v   ({M{clk}}),
+        .rst_v   ({M{rst}}),
+        .en_v    ({M{cell_en}}),
+        .zero_v  ({M{cell_zero}}),
+        .slot_v  ({M{slot_q}}),
+        .dslot_v ({M{drain_slot}}),
+        .row_hit_v(row_hit),
+        .a_v     (a_bus),
+        .b_n_flat(b_bus),
+        .clk_s   (clk),
+        .drain_col_sel(drain_idx[NW-1:0]),
+        .drain_data(drain_data)
+    );
 
     // ── FSM ──────────────────────────────────────────────────────────
     always_ff @(posedge clk) begin

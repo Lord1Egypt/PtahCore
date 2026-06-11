@@ -2,7 +2,28 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, after Phase 7b-3):**
+> **▶ RESUME HERE (as of 2026-06-11, Phase 7c IN PROGRESS, branch
+> `feat/phase7c-array-rtl`):** PR #18 merged (18 PRs). docs/ARRAY_SPEC.md
+> = the 2D wave contract. **7c-1 RTL DONE:** rtl/mac_grid.sv (M×N tile
+> sea + south drain strip), mac_array re-plumbed on it (mac_row.sv kept
+> as the 7b-3 artifact), STORE row-change settle bubble (+M cycles per
+> burst) + pymodel twin; ALL GREEN: 16 RTL units (58 results, incl. 3
+> new mac_grid TBs) + 37 Python. Packed chain arrays (Verilator 5.020
+> false UNOPTFLAT on 2D unpacked; split_var can't split multi-dim).
+> **7c-2 flow files DONE (unrun):** flow/designs/asap7/mac_grid/
+> {config.mk, constraint.sdc (per-row clocks, δs=150 ps stagger TO BE
+> TUNED to measured in-context arcs, settled-bus multicycle -through
+> row 31 drain pins), gen_floorplan.py → macro_place.tcl (1024 macros,
+> row 0 at TOP) + io_constraints.tcl, pdn.tcl, mac_tile/config.mk} +
+> flow/harden_grid.sh (block→abstract→clk-arc patch→grid).
+> **Next — 7c-3:** run `ORFS_MAKE_ARGS='NUM_CORES=6'
+> flow/harden_grid.sh` (hours; tile rebuild ~6 min + 1024-macro P&R),
+> iterate δs against measured b/drain arcs, extend
+> flow/check_abutment.py to 2D grids, per-tile clock-arrival honesty
+> table, HARDENING.md results, then PR.
+> Re-verify RTL: `cd rtl/tb && make all_leaves`; Python: `pytest golden pymodel -q`.
+>
+> *(previous checkpoint, after Phase 7b-3):*
 > Phases 0–7b complete — **four GDS out**: mac_cell, hierarchical row,
 > mac_tile, and the headline: **the ABUTTED TRAVELING-CLOCK ROW** — 32
 > tiles pin-on-pin, zero gap, NO row CTS, clock marching +82.34 ps/tile,
