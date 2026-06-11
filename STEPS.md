@@ -2,24 +2,23 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-12 ~00:15, Phase 7c-3 attempt 3 RUNNING,
-> branch `feat/phase7c3-grid-harden`):** THE CONTRACT CLOSES. Attempts
-> 1–2 story (HARDENING.md): single-δs staggering can't wave-match buses
-> with 3× per-bit arc spread, and tile-internal set_min_delay floors are
-> a measured NO-OP (rev-B/C libs byte-identical; the 7b-3 row really
-> closed via parent-side pre-delay buffers). Fix = PER-BIT pre-delay
-> interface contracts + early-spine-tap drain capture, generated from
-> the lib by flow/designs/asap7/mac_grid/gen_constraints.py →
-> constraint.sdc (regenerate after any tile re-char). **Validated on the
-> attempt-2 placed DB, propagated clocks: setup +1139 / hold +78, TNS 0
-> both.** Attempt 3 running detached: /tmp/grid_harden3.log (tile
-> rebuilds once — comment-only SDC change — then the grid).
-> Offline SDC iteration loop (minutes, no flow): docker STA vs
-> 3_5_place_dp.odb — see /tmp/val2.tcl pattern or HARDENING.md.
-> After success: 6_finish.rpt + 5_route_drc.rpt + check_abutment
-> (--rows 32 --x0 2.16 --y0 12.96) + report_clock_table (--rows 32;
-> arrivals ~85/row + ~82.34/col) + HARDENING.md results + docs/img +
-> PR. Re-verify RTL: `cd rtl/tb && make all_leaves`; `pytest golden pymodel -q`.
+> **▶ RESUME HERE (as of 2026-06-12 ~01:00, Phase 7c-3 attempt 3 in
+> ROUTING, branch `feat/phase7c3-grid-harden`):** **THE ARRAY IS
+> TIMING-CLOSED THROUGH CTS** — grid passed 4_1 with ZERO hold
+> violations (no RSZ-0060), post-CTS propagated STA: **setup +1143 /
+> hold +32, TNS 0 both**. The per-bit pre-delay contracts + early
+> spine tap (gen_constraints.py) are the validated mechanism — see
+> HARDENING.md for why tile-internal min_delay floors are a no-op.
+> First 5_1 GRT died Error 247 (OOM at 7 GB WSL2 cap, congestion loop
+> iter 3/30) → `GRT_ALLOW_CONGESTION=1` added, flow RESUMED detached:
+> /tmp/grid_harden4.log (stages ≤4 cached). If GRT/DRT OOMs again, the
+> remaining lever is the Windows-side .wslconfig memory bump (host
+> 16 GB → give WSL ~12 GB + swap; requires wsl --shutdown = kills the
+> session — coordinate with Mohamed). After success: 6_finish.rpt,
+> 5_route_drc.rpt, check_abutment --rows 32 --x0 2.16 --y0 12.96,
+> report_clock_table --rows 32 (~85/row + ~82.34/col), HARDENING.md
+> results, docs/img renders, PR.
+> Re-verify RTL: `cd rtl/tb && make all_leaves`; `pytest golden pymodel -q`.
 >
 > *(previous checkpoint, after Phase 7b-3):*
 > Phases 0–7b complete — **four GDS out**: mac_cell, hierarchical row,
