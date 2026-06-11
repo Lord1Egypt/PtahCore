@@ -58,6 +58,11 @@ ifeq ($(TOP),mac_row)
   MODULE = test_mac_row
   COMPILE_ARGS += -GN=4
 endif
+ifeq ($(TOP),mac_grid)
+  VERILOG_SOURCES = $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv $(RTL)/mac_grid.sv
+  MODULE = test_mac_grid
+  COMPILE_ARGS += -GM=4 -GN=4
+endif
 ifeq ($(TOP),mac_array)
   VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv $(RTL)/mac_grid.sv $(RTL)/mac_array.sv
   MODULE = test_mac_array
