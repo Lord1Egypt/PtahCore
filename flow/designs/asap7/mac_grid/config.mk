@@ -55,9 +55,11 @@ export HOLD_SLACK_MARGIN = 15
 export SETUP_SLACK_MARGIN = 100
 export SLEW_MARGIN = 30
 
-# The congestion-resolution loop in global route exhausted the 7 GB
-# WSL2 VM (Error 247 at extra-iteration 3/30) while post-CTS timing was
-# already fully closed (+1143/+32, TNS 0). Most of the die is abutted
-# pin-on-pin connections with no real routing demand; let GRT hand its
-# (local) congestion to detailed route instead of resolving it in-core.
-export GRT_ALLOW_CONGESTION = 1
+# The congestion-resolution loop in global route exhausts the 7 GB
+# WSL2 VM at extra-iteration 3/30 (Error 247, twice) while post-CTS
+# timing is already fully closed (+1143/+32, TNS 0). Most of the die is
+# abutted pin-on-pin connections with no real routing demand: cap the
+# loop below the OOM point and hand the (local) leftover congestion to
+# detailed route. (GRT_ALLOW_CONGESTION is not an ORFS variable — the
+# knob is GLOBAL_ROUTE_ARGS, found in variables.yaml.)
+export GLOBAL_ROUTE_ARGS = -congestion_iterations 2 -allow_congestion -congestion_report_iter_step 1 -verbose
