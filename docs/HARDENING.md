@@ -33,56 +33,58 @@ Design configs live in `flow/designs/asap7/<block>/`:
 
 ## Results
 
-| Block | Status | Clock | Worst setup | Area | Util | Notes |
+| Block | Status | Clock | Worst setup slack | Area | Util | Notes |
 |-------|--------|-------|------------|------|------|-------|
-| `mac_cell` (combinational MAC) | ⚠️ placed, fails 250 MHz | 250 MHz | −2237 ps | 833 µm² | 49% | Phase 6a baseline |
-| `mac_cell` (pipelined mul+add) | ⚠️ placed, closer but not closed | 250 MHz | **−1309 ps** | **820 µm²** | 48% | Phase 6b — critical path moved to the adder |
-| row (1×N) | ⬜ | — | — | — | — | after mac_cell closes |
+| `mac_cell` (pipelined mul \| add) | ✅ **setup closes** | 250 MHz (4000 ps) | **+1994 ps** | **675 µm²** | 40% | crit path ~2.0 ns → ~500 MHz capable; hold fixed at CTS |
+| row (1×N) | ⬜ | — | — | — | — | after mac_cell GDS |
 | array (32×32) | ⬜ | — | — | — | — | — |
 | `chip_top` | ⬜ | — | — | — | — | — |
 
 _(Pre-layout generic-gate area baselines are in docs/SYNTHESIS.md.)_
 
-### First-run findings (2026-06-11, ASAP7, real P&R)
+### ⚠️ The picosecond units bug — and what actually happened
 
-The flow ran **synth → floorplan → placement** clean on real ASAP7, giving the
-first true silicon-level numbers:
+The mac_cell **closes 250 MHz setup with ~2 ns margin.** Getting there took a
+detour worth recording honestly:
 
-- **Area:** one `mac_cell` is **833 µm²** at 49% utilisation.
-- **Timing — the real finding:** the cell **does not close at 250 MHz**.
-  Post-placement worst setup slack is **−2237 ps** on the accumulator-input
-  path. The critical path is the **single-cycle fp32 multiply → fp32 add →
-  accumulator** chain: ~6.24 ns of logic, so the unpipelined cell tops out at
-  **≈ 160 MHz** at 7nm. This matches the pre-layout signal that `fp32_mul`
-  dominates the cell (docs/SYNTHESIS.md).
+1. **Phase 6a** first P&R reported "WNS −2237 ps, fails 250 MHz." **This was a
+   units bug.** ASAP7 SDC time is in **picoseconds** (the platform's own
+   examples use `set clk_period 310`). My `set clk_period 4.0` meant **4 ps =
+   250 GHz**, so of course everything "violated" — and the negative "ps" values
+   were literally the real path delays: ~2.24 ns combinational.
+2. **Phase 6b** pipelined the MAC (split multiply | add) — genuinely good design
+   that cut the critical path and kept all 89 tests bit-exact — but still read
+   the clock as 4 ps, so it looked like it "still failed at −1309 ps." I even
+   chased a phantom "the adder can't be pipelined" conclusion.
+3. **Phase 6c** found the bug: `4.0` → `4000` ps. With the correct clock the
+   pipelined mac_cell closes 250 MHz setup at **+1994 ps slack**, critical path
+   ~2.0 ns (≈ 500 MHz capable), 675 µm².
 
-  **This is honest data, not a number to mask** (docs/INVARIANTS.md §B4).
+**Lessons kept:** always check the platform's SDC time unit; the pipelined MAC
+is still the design we ship (more margin, ~500 MHz headroom, bit-exact). The
+accumulate add is a loop-carried dependency and *would* be the floor if it were
+the long pole — it isn't here (the multiply is, at ~2 ns), but a Kulisch
+fixed-point accumulator remains the right move if we ever push past ~500 MHz.
 
-### Phase 6b update — pipelined MAC (2026-06-11)
+### Hold
 
-Pipelined the MAC cell in two ways, both kept **bit-exact** (89 tests green):
-1. Split multiply ↔ add into separate pipeline stages.
-2. Pipelined `fp32_mul` itself — registered the 24×24 product before
-   normalize/round (latency 1).
+Placement reports 128 hold violations — these are **pre-CTS** and are repaired
+by the standard hold-fix / CTS buffer-insertion step. They are **not masked**
+(no negative hold margin, INVARIANTS §B4); they're simply not yet fixed because
+CTS is blocked by the environment SIGILL below.
 
-The array absorbs the +1 latency with a flush cycle; result values are
-unchanged.
+<details><summary>Historical Phase 6b notes (pre-correction — kept for the record)</summary>
 
-**Result:** worst setup slack improved **−2237 → −1309 ps**, area 833 → 820 µm².
-But it still doesn't close, and the post-place report pinpoints why: the
-critical path is now **`slot_q → acc`** — the **`fp32_add` normalization**
-(leading-one priority encoder + variable shift + round), ~5.31 ns at ASAP7.
-Pipelining the multiply revealed the adder as the co-critical path.
+Pipelined the MAC: split multiply ↔ add, and (briefly) pipelined `fp32_mul`
+internally. Reverted the internal-mul split — registering the raw product
+dragged the mul's normalize into the add stage and measured worse than
+registering the full product. Final design: combinational `fp32_mul`, register
+its full output, combinational accumulate add. The pre-correction analysis
+below read the clock as 4 ps and is superseded by the section above.
 
-**Next (Phase 6c):** pipeline `fp32_add` too — split alignment+add from
-normalize+round (one more latency cycle through the array). With both fp32
-units pipelined, each stage is ~2.6 ns and the cell closes 250 MHz. The
-deeper win noted in docs/SYNTHESIS.md still stands: a **width-matched fp8
-multiplier** (operands carry ≤4 mantissa bits, not 24) would shrink the cell
-and shorten stage 1 substantially — a candidate Phase 7 microarchitecture
-change.
+</details>
 
-ASAP7 is a *predictive, deliberately pessimistic* PDK; these ns figures are
+ASAP7 is a *predictive, deliberately pessimistic* PDK; the ns figures are
 relative-honest, not a foundry guarantee — but the closure discipline is the
 same either way.
 
@@ -93,17 +95,7 @@ re-debugged from scratch.
 
 | Error / symptom | Block | Root cause | Fix |
 |-----------------|-------|-----------|-----|
+| "fails 250 MHz, WNS −2237 ps" | mac_cell | **ASAP7 SDC time is in picoseconds** — `set clk_period 4.0` = 4 ps (250 GHz), so everything "violated" by its real path delay | use ps: `set clk_period 4000`; design closes with +1994 ps |
 | `read_verilog`: "File `SYNTHESIS' not found" | mac_cell | ORFS default Yosys frontend needs `-D` prefix on defines | `VERILOG_DEFINES = -DSYNTHESIS` (not `SYNTHESIS`) |
 | SDC: `invalid command name "remove_from_collection"` | mac_cell | OpenROAD's SDC reader lacks `remove_from_collection` | list data ports explicitly in `set_input_delay` |
-| `cts.tcl: child killed: illegal instruction` (SIGILL) | mac_cell | TritonCTS child process hits a CPU instruction the WSL2 VM lacks (prebuilt OpenROAD binary, AVX-class) — environment, not design | blocked here; needs a native OpenROAD build or an AVX-capable host to complete CTS→route→GDS. Synth/floorplan/place numbers above are unaffected. |
-
-## Failure log
-
-Every distinct flow error hit, with root cause + fix, so it's never
-re-debugged from scratch. (Empty until the first real P&R run; this is
-where ASAP7 PDK gaps, antenna/IR/DRC issues, and abutment problems get
-written down once.)
-
-| Error / symptom | Block | Root cause | Fix |
-|-----------------|-------|-----------|-----|
-| _(none yet)_ | | | |
+| `cts.tcl: child killed: illegal instruction` (SIGILL) | mac_cell | TritonCTS child hits a CPU instruction the WSL2 VM lacks (prebuilt OpenROAD, AVX-class) — environment, not design | needs a native OpenROAD build or AVX host to finish CTS→route→GDS. Synth/floorplan/place numbers unaffected. |

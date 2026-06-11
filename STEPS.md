@@ -6,12 +6,11 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 > Phases 0–4 complete. **The whole chip works** — `chip_top.sv` runs a full
 > multi-tile matmul end-to-end through real Verilog, bit-exact vs golden.
 > **Score: 89 tests green (52 RTL + 37 Python), 8 PRs merged.**
-> **Next up = Phase 6: ASAP7 7nm hardening** — install OpenROAD/ORFS + ASAP7
-> PDK, then synth→floorplan→P&R→GDSII for mac_cell first (the tile that abuts
-> 1024×), then the array, then chip_top — with honest timing closure (the
-> thing the prior-art chip never achieved). Yosys elaboration + gate baseline
-> already done (Phase 5, `synth/`, `docs/SYNTHESIS.md`). Re-verify RTL with
-> `cd rtl/tb && make all_leaves`; synth smoke = `yowasp-yosys -s synth/elaborate.ys`.
+> **Phase 6 status:** mac_cell **closes 250 MHz setup on ASAP7** (+1994 ps,
+> 675 µm², ~500 MHz capable), bit-exact. Synth→floorplan→place run via
+> `flow/harden.sh mac_cell`. **Next:** finish CTS→route→GDS (needs an
+> AVX-capable host / native OpenROAD — WSL2 SIGILLs TritonCTS), then harden the
+> row → 32×32 array → chip_top. Re-verify RTL: `cd rtl/tb && make all_leaves`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
@@ -120,17 +119,20 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
 - [x] Failure log populated (HARDENING.md): VERILOG_DEFINES -D prefix, SDC
       remove_from_collection, **CTS SIGILL (WSL2 CPU lacks AVX-class instr —
       env blocker, stops CTS→route→GDS here)**
-- [x] **Phase 6b: pipelined MAC cell** — split mul↔add + pipelined fp32_mul
-      (registered 24×24 product); array absorbs +1 latency via flush cycle;
-      **bit-exact (89 tests)**. WNS −2237 → **−1309 ps**, area 833 → 820 µm² (PR #12)
-- [x] Root cause of remaining violation pinpointed: critical path is now
-      `slot_q → acc` = **fp32_add normalization** (~5.31 ns at ASAP7)
-- [ ] **Phase 6c: pipeline fp32_add** (split align+add from normalize+round,
-      +1 array latency, keep bit-exact, update its clocked TB) → closes 250 MHz
-- [ ] (Phase 7 stretch) width-matched fp8 multiplier (≤4 mantissa bits, not 24)
-      — shrinks the cell + shortens mul stage
-- [ ] Complete CTS→route→GDS on an AVX-capable host or native OpenROAD build
-- [ ] mac_cell tile: clean GDS, 0 DRC, timing closed at 250 MHz (honest)
+- [x] **Phase 6b: pipelined MAC cell** — split mul↔add; array absorbs +1
+      latency via flush cycle; **bit-exact (89 tests)** (PR #12)
+- [x] **Phase 6c: found the picosecond units bug** — ASAP7 SDC is in ps;
+      `clk_period 4.0` meant 4 ps (250 GHz). Fixed to `4000`. (PR #13)
+- [x] **mac_cell CLOSES 250 MHz setup** — worst slack **+1994 ps**, crit path
+      ~2.0 ns (≈500 MHz capable), **675 µm²**. The "fails timing" saga was the
+      unit bug; the design was always fine.
+- [x] Reverted the internal-mul split (registering raw product measured worse);
+      final cell = combinational fp32_mul, register full product, comb. add
+- [ ] Complete CTS→route→GDS on an AVX-capable host / native OpenROAD (WSL2
+      SIGILL blocks TritonCTS here); fixes the 128 pre-CTS hold violations
+- [ ] Harden the 1×N abutted row, then the 32×32 array, then chip_top
+- [ ] (Phase 7 stretch, only if pushing past ~500 MHz) Kulisch fixed-point
+      accumulator and/or width-matched fp8 multiplier
 
 ## Phase 7 — Hardening: array + chip
 - [ ] Abutted row (1×32) with traveling clock

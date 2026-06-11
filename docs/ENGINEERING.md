@@ -21,7 +21,7 @@ for both Python and SV.
 | 3 | RTL modules vs pymodel (cocotb) | ✅ done — 11 units, 45 tests |
 | 4 | Full RTL integration + e2e | ✅ done — chip_top runs multi-tile matmul |
 | 5 | Synthesis smoke (Yosys elaboration + area) | ✅ done — 0 latches, baseline in docs/SYNTHESIS.md |
-| 6 | Hardening: leaf tiles | 🔨 in progress — ORFS flow + tile spec ready, P&R pending |
+| 6 | Hardening: leaf tiles | 🔨 mac_cell closes 250 MHz setup on ASAP7 (+1994 ps, 675 µm²); CTS→GDS env-blocked |
 | 7 | Hardening: array + chip (traveling clock) | ⬜ |
 | 8 | HW block scaling (MX-style) | ⬜ |
 | 9 | 2:4 structured sparsity | ⬜ |
