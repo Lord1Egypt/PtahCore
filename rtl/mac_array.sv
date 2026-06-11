@@ -90,6 +90,9 @@ module mac_array #(
     // drain_idx is row-major (i*N + j); N is a power of two, so the low
     // $clog2(N) bits select the column inside a row and the high bits
     // select the row — the same mux the flat grid had, split in two.
+    // Rows REGISTER their drain (see mac_row — traveling-clock return
+    // path), so the row-select bits are delayed one cycle to stay
+    // coherent: drain_data answers the drain_idx of the PREVIOUS cycle.
     localparam int NW = $clog2(N);
     logic [31:0] drain_row [M];
     generate
@@ -106,7 +109,11 @@ module mac_array #(
         end
     endgenerate
 
-    assign drain_data = drain_row[drain_idx[$clog2(M*N)-1:NW]];
+    logic [$clog2(M*N)-1-NW:0] drain_row_sel_q;
+    always_ff @(posedge clk) begin
+        drain_row_sel_q <= drain_idx[$clog2(M*N)-1:NW];
+    end
+    assign drain_data = drain_row[drain_row_sel_q];
 
     // ── FSM ──────────────────────────────────────────────────────────
     always_ff @(posedge clk) begin

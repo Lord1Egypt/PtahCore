@@ -11,7 +11,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -83,9 +83,13 @@ async def _drain_check(dut, slot, ref):
     flat = ref.ravel()
     dut.drain_slot.value = slot
     for idx in range(M * N):
+        # registered drain: drive mid-cycle, value valid after the edge
+        await FallingEdge(dut.clk)
         dut.drain_idx.value = idx
         await RisingEdge(dut.clk)
+        await ReadOnly()
         got = f32(int(dut.drain_data.value))
+        await RisingEdge(dut.clk)
         assert got == flat[idx], f"idx {idx}: {got} != {flat[idx]}"
 
 

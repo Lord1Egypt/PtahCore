@@ -92,11 +92,17 @@ async def _store_run(dut, tile_f32, dtype):
 
     writes = {}
     flat = tile_f32.ravel()
+    prev_idx = None                  # registered drain: answers last request
     for _ in range(len(flat) + 4):
         await Timer(0)               # post-edge combinational settle
         idx = int(dut.drain_idx.value)
         assert int(dut.drain_slot.value) == 1
-        dut.drain_data.value = f32bits(flat[idx]) if idx < len(flat) else 0
+        # model the REGISTERED array drain: drain_data this cycle is the
+        # value for the drain_idx presented LAST cycle
+        if prev_idx is not None and prev_idx < len(flat):
+            dut.drain_data.value = f32bits(flat[prev_idx])
+        else:
+            dut.drain_data.value = 0
         await ReadOnly()             # drain_data → gmem_wr_data propagated
         done = bool(int(dut.done.value))
         if int(dut.gmem_wr_en.value):
@@ -105,6 +111,7 @@ async def _store_run(dut, tile_f32, dtype):
         if done:
             assert int(dut.done_bar.value) == 4
         await RisingEdge(dut.clk)
+        prev_idx = idx
         if done:
             break
     return writes

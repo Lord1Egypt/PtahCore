@@ -22,12 +22,17 @@ export VERILOG_DEFINES = -DSYNTHESIS
 export SDC_FILE       = $(PTAHCORE)/flow/designs/asap7/mac_tile/constraint.sdc
 export IO_CONSTRAINTS = $(PTAHCORE)/flow/designs/asap7/mac_tile/io.tcl
 
-# Fixed, site-aligned outline (TILE_SPEC §1: identical across instances,
-# multiple of the site grid). 46.44 = 860 × 0.054 µm sites = 172 × 0.27 µm
-# rows — integral both ways, so abutted tiles land on-grid by construction.
-# Core inset 1.08 (20 sites / 4 rows) per side.
-export DIE_AREA  = 0 0 46.44 46.44
-export CORE_AREA = 1.08 1.08 45.36 45.36
+# Fixed outline (TILE_SPEC §1: identical across instances, multiple of
+# the site grid AND of every owned routing-track pitch — place_macro
+# snaps macros to tracks, so a width that isn't track-integral flips the
+# track phase tile-to-tile and zero-gap abutment becomes overlap; the
+# first 46.44 µm tile hit exactly that, +24 nm snap = half an M5 pitch).
+#   width  46.656 = 108 × 0.432  (0.432 = lcm of site 0.054, M1/M3 0.036,
+#                                 M5 0.048 — every vertical pitch)
+#   height 47.52  =  22 × 2.16   (2.16 = lcm of row 0.27, M2 0.036,
+#                                 M4 0.048 — every horizontal pitch)
+export DIE_AREA  = 0 0 46.656 47.52
+export CORE_AREA = 1.08 1.08 45.576 46.44
 export PLACE_DENSITY = 0.55
 
 # Tile/parent layer split (same as the 7a block): the tile keeps M1–M5,
