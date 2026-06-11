@@ -2,7 +2,19 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, after Phase 7b-3):**
+> **▶ RESUME HERE (as of 2026-06-11, Phase 7c IN PROGRESS, branch
+> `feat/phase7c-array-rtl`):** PR #18 merged (18 PRs). 7c design is
+> WRITTEN: docs/ARRAY_SPEC.md = the 2D wave contract (southward clock
+> stagger δs ≈ b_in→b_out arc; per-row clk ports, spine is chip_top's
+> job; drain = settled-bus multicycle 2 earned by a STORE row-change
+> bubble; grid hardened FLAT, 1024 mac_tile macros). Measured vertical
+> lib arcs: b_in→b_out 152–216 ps, drain_n→drain_s 173–192 ps (NOT
+> rev-B floored — δs must sit at/below fast corner). **Next: 7c-1 RTL**
+> — rtl/mac_grid.sv (per §4), re-plumb mac_array on it (mac_row.sv
+> stays untouched as the 7b-3 artifact), STORE row bubble + pymodel
+> twin, keep 94 tests bit-exact. Then 7c-2 flow (§5).
+>
+> *(previous checkpoint, after Phase 7b-3):*
 > Phases 0–7b complete — **four GDS out**: mac_cell, hierarchical row,
 > mac_tile, and the headline: **the ABUTTED TRAVELING-CLOCK ROW** — 32
 > tiles pin-on-pin, zero gap, NO row CTS, clock marching +82.34 ps/tile,
