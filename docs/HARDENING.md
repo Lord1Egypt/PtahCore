@@ -38,7 +38,7 @@ Design configs live in `flow/designs/asap7/<block>/`:
 | `mac_cell` (pipelined mul \| add) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+1928 ps** | **+13 ps** | **750 µm²** | 44% | signoff: 0 setup / 0 hold / 0 slew / 0 cap / 0 fanout violations, **DRC clean**; crit path ~2.07 ns → ~480 MHz capable |
 | row (1×32, hierarchical) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+386 ps** | **+438 ps** | **66,284 µm²** | 56% | 32 `mac_cell` hard macros (BLOCKS flow) + drain mux/broadcast stdcells; 0 setup / 0 hold / 0 cap / 0 fanout, **DRC clean**; ⚠ 3 max-slew pins ≤39 ps over the 320 ps lib limit (see below — recorded, not waived) |
 | `mac_tile` (abutment tile) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+1620 ps** | **+15 ps** | **773 µm²** | 39% | fixed 46.44×46.44 µm site-aligned outline; **0 violations of any type, DRC clean**; all 73 mirrored pin pairs verified coordinate-exact in the DEF; feedthrough arcs: A ~84–98 ps ≈ clk ~89 ps (traveling clock matched to the data wave by construction); internal clock insertion 54–70 ps |
-| row (1×N, traveling clock) | ⬜ | — | — | — | — | — | Phase 7b-3 |
+| **row (1×32, ABUTTED + traveling clock)** | ✅ **GDS complete** | 250 MHz (4000 ps) | **+180 ps** | **+48 ps** | **71,984 µm²** | 83% | **no row CTS** — the clock enters tile 0 once and travels the chain (+82.34 ps/tile, STA-visible through all 32 tiles); 0 setup / 0 hold / 0 cap / 0 fanout, **DRC clean incl. all 31 abutted boundaries**; `check_abutment.py`: 32 tiles exact-grid, 1271 pin pairs edge-contact; ⚠ 2 max-slew pins ≤2.8 ps over (route-erosion tail, recorded) |
 | array (32×32) | ⬜ | — | — | — | — | — | — |
 | `chip_top` | ⬜ | — | — | — | — | — | — |
 
@@ -185,6 +185,69 @@ type and a negative rise reference — the row STA must be checked to consume
 it correctly (the `min/max_clock_tree_path` entries, 54–70 ps, carry the
 internal insertion).
 
+## Fourth GDS — the abutted traveling-clock row (Phase 7b-3)
+
+The chip-scale clocking thesis, proven at row scale: **32 mac_tile macros
+abutted pin-on-pin with zero gap, no row clock tree.** The clock enters
+tile 0 once and marches east through each tile's characterised
+clk_in→clk_out feedthrough — STA shows it arriving +82.34 ps later per
+tile, rising edge preserved, with every input wave matched to travel
+with it. Signoff: **setup +180 ps / hold +48 ps @ 250 MHz, 0 setup / 0
+hold violations, DRC clean across all 31 abutted boundaries**, 71,984 µm²
+@ 83% util. The worst hold path is `a_f32 → col[31]` — the far end of the
+wave — at **positive** margin, which is the whole point.
+
+![abutted row layout](img/mac_row_abut_gds.webp)
+
+Five real problems stood between run 1 and this GDS, each now in the
+failure log below: macro track-phase snapping, PDN ring margins, a
+placer divergence, the PDN halo conflict, and — the big one — a .lib
+encoding that silently unconstrained 31 of 32 tiles.
+
+### The false-clean: a .lib arc that ate the clock
+
+`write_timing_model` encodes the tile's clk_in→clk_out feedthrough as a
+`falling_edge` arc. Edge-triggered arcs **terminate clock propagation**
+in OpenSTA (same rule as a flop's clk→q) — so in the first completed
+run, only tile 0 had a clock; **tiles 1–31 were silently unconstrained**
+and the report looked plausible (it still showed violations — all on
+tile-0-reachable paths). `flow/patch_tile_clk_arc.py` rewrites the arc
+`combinational`/`positive_unate`, reusing the tool's own measured fall
+tables (~82 ps); `flow/harden_abutted_row.sh` applies it between the
+block abstract and the parent run. A model-encoding fix, not a waiver —
+and the moment the clock became visible, the next real bug surfaced:
+
+### The data wave outran the clock wave
+
+The 1-bit control feedthroughs cross a tile in ~46 ps; the clock takes
+~82 ps. From ~tile 16 east, data arrived **before** its capture clock —
+genuine hold violations on every far tile, invisible until the clock
+propagated. Fix at the source, per TILE_SPEC §3: `set_min_delay 85` on
+every west→east feedthrough in the tile (rev B), so the data wave gains
+margin eastward instead of losing it. Setup tolerates data lagging the
+clock; hold does not tolerate it leading.
+
+### The drain came home a cycle late — so the RTL pays the cycle
+
+A far tile launches its accumulator on a clock that has traveled ~2.7 ns
+east; the combinational 32:1 mux could not return it across 1.5 mm
+within the same early-clock cycle (**−460 ps post-route, all 32
+drain_out bits — the honest single-cycle failure**). Fixed in RTL, not
+SDC: the row registers its drain (`mac_row.sv`), the array delays its
+row-select to match, and STORE grew a request/write-back stage (+1 cycle
+latency per STORE, throughput unchanged, all 94 tests bit-exact).
+`drain_slot` — latched at STORE start and burst-static by construction —
+is declared multicycle-2, mirroring the RTL contract the way `rst` is
+false-pathed.
+
+### B travels too (the array contract, modeled honestly)
+
+At array scale the B bus runs along the north edge west→east,
+accumulating the same per-tile delay as the clock. The row's SDC models
+per-column B input delays (`io_delay + j × 82.34 ps`); a flat delay
+would manufacture a ~2.5 ns phantom hold wall the real array never
+produces. Phase 7c implements that delivery physically.
+
 ## Failure log
 
 Every distinct flow error hit, with root cause + fix, so it's never
@@ -204,3 +267,12 @@ re-debugged from scratch.
 | detailed route never converges (466 stuck violations), then OOM | mac_row | macros placed flush against the core's south edge → no routing channel below the macro pins | center the macro row vertically (y = 16.2 µm = 60 site rows) — channels both sides; DRC clean afterwards |
 | detailed route OOM at ~7.2 GB (make error 247) | mac_row | OpenROAD defaults to all 12 threads; WSL2 VM has 7 GB | `ORFS_MAKE_ARGS='NUM_CORES=6'` passthrough added to `flow/harden.sh` (ORFS: `OPENROAD_ARGS = -threads $(NUM_CORES)`) |
 | 3 max-slew pins survive `SLEW_MARGIN = 30`, worst −39 ps | mac_row | global-route vs detailed-route RC mismatch on individual buffer hops (~115 ps) exceeds any practical uniform margin | **recorded, not waived** — slacks already include the real slews; row top is re-laid-out in 7b |
+| `MPL-0041` overlap placing abutted macros at exact pitch | mac_row_abut | `place_macro` snaps macros to routing tracks; a tile width that is site-aligned but not track-aligned flips track phase tile-to-tile (+24 nm = half an M5 pitch) | tile dims must be multiples of every owned track pitch: width quantum 0.432 µm, height quantum 2.16 µm → tile resized 46.44² → **46.656 × 47.52** (TILE_SPEC §1 updated) |
+| `PDN-0351` rings don't fit | mac_row_abut | BLOCKS PDN rings need ~1.7 × 1.6 µm of core-to-die spacing; 1.08 µm given | core-to-die spacing 2.16 µm |
+| `GPL-0305` RePlAce diverges (Inf/NaN) | mac_row_abut | ~250 µm² of stdcells in a 71k µm² macro sea — routability/timing inflation (+339%) explodes the gradient | `GPL_ROUTABILITY_DRIVEN=0`, `GPL_TIMING_DRIVEN=0` (trivial placement problem) |
+| `PSM-0069` every tile's VDD unconnected (end of flow) vs `PDN-0179` channel error (halo 0) | mac_row_abut | `MACRO_ROWS_HALO` drives BOTH row cutting and the per-macro PDN grid; abutment needs them split: PDN halo must be 0 (overlapping ElementGrids silently skip all pin connects) while rows must stay cut ~2 µm clear (halo 0 leaves an unrepairable M2 rail sliver) | design-local `pdn.tcl` with the ElementGrid halo hardcoded 0; row cutting keeps the platform default. Verified with `check_power_grid` on the floorplan (~1 min iteration, no full flow) |
+| tiles 1–31 silently UNCONSTRAINED (false-clean timing) | mac_row_abut | `write_timing_model` encodes clk_in→clk_out as a `falling_edge` arc → OpenSTA terminates clock propagation at tile 0's clk_out | `flow/patch_tile_clk_arc.py` (combinational, measured tables); applied by `flow/harden_abutted_row.sh` between block abstract and parent run. **Verify clock arrival per tile in the report before trusting ANY hierarchical timing** |
+| far-tile hold violations once the clock propagated | mac_row_abut | data feedthroughs (~46 ps/tile) outran the clock feedthrough (~82 ps/tile) — data arrived before its capture clock from ~tile 16 | tile rev B: `set_min_delay 85` on every west→east feedthrough (wave matching, TILE_SPEC §3) |
+| all 32 drain_out bits fail setup −460 ps | mac_row_abut | far tiles launch on a clock ~2.7 ns east; combinational mux return can't recross 1.5 mm in the early-clock cycle | RTL: registered row drain + array row-select delay + STORE write-back stage (94 tests bit-exact); drain_slot multicycle-2 mirrors its burst-static RTL contract |
+| `make all_leaves` exits 0 with failing tests | rtl/tb | cocotb 1.x's Makefile.sim does not propagate test failures | `rtl/tb/check_results.py` parses results.xml after every sim; the driver fails on any `<failure>` |
+| 2 max-slew pins, worst −2.8 ps | mac_row_abut | same GR-vs-DRT erosion tail as the 7a row, now ≤0.9% over the limit | **recorded, not waived** |

@@ -18,6 +18,7 @@ HERE := $(shell pwd)
 .PHONY: sim all_leaves clean
 sim:
 	$(MAKE) -f cocotb.mk TOP=$(TOP) PYTHON3=$(HERE)/python3-clean
+	@python3 check_results.py
 
 all_leaves:
 	$(MAKE) sim TOP=fp8_decode

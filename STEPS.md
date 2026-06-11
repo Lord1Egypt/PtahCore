@@ -2,20 +2,23 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, after Phase 7b-1):**
-> Phases 0–6 + 7a + 7b-1 (tile-boundary RTL) complete.
-> **Second GDS is out — the 1×32 row**, first
-> hierarchical build: 32 `mac_cell` hard macros (ORFS BLOCKS flow) on a
-> deterministic pitch, setup **+386 ps** / hold **+438 ps** @ 250 MHz,
-> 0 setup/hold violations, **DRC clean**, 66,284 µm² @ 56% util (3 max-slew
-> pins ≤12% over lib limit — recorded honestly in docs/HARDENING.md, die in
-> 7b's re-layout). Key trap fixed: virtual-clock latency must be `-source`
-> or ORFS's post-CTS `set_propagated_clock` discards it (phantom −669 ps
-> hold wall). Runs need `ORFS_MAKE_ARGS='NUM_CORES=6'` on this 7 GB WSL2 VM.
-> **Score: 94 tests green (57 RTL + 37 Python), 15 PRs merged.**
-> **Next — Phase 7b-2/3:** harden mac_tile with edge pin constraints, then
-> the abutted 1×32 row with the traveling clock (docs/TILE_SPEC.md), then
-> 32×32 array, then chip_top.
+> **▶ RESUME HERE (as of 2026-06-11, after Phase 7b-3):**
+> Phases 0–7b complete — **four GDS out**: mac_cell, hierarchical row,
+> mac_tile, and the headline: **the ABUTTED TRAVELING-CLOCK ROW** — 32
+> tiles pin-on-pin, zero gap, NO row CTS, clock marching +82.34 ps/tile,
+> setup **+180 ps** / hold **+48 ps** @ 250 MHz, 0 violations, DRC clean
+> across all 31 abutted boundaries. This is the clocking thesis autogpu
+> never closed, proven at row scale. Build with
+> `ORFS_MAKE_ARGS='NUM_CORES=6' flow/harden_abutted_row.sh` (orchestrates
+> block → abstract → clk-arc patch → row; the patch step is MANDATORY —
+> without it 31 of 32 tiles are silently unconstrained, see HARDENING.md).
+> Verify with `flow/check_abutment.py`. Drain is now REGISTERED at the
+> row boundary (+1 cycle STORE latency, 94 tests bit-exact).
+> **Score: 94 tests green (57 RTL + 37 Python), 17 PRs merged.**
+> **Next — Phase 7c:** the 32×32 array — stack 32 rows by vertical
+> abutment (height quantum already baked in), traveling B delivery along
+> the north edge (the SDC contract the row already models), drain chains
+> south, row decoders. Then 7d chip_top.
 > Re-verify RTL: `cd rtl/tb && make all_leaves`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
@@ -179,8 +182,21 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       A feedthrough ~84–98 ps — traveling clock matched to the data wave by
       construction. Open for 7b-3: verify row STA consumes the
       falling_edge-encoded clk_in→clk_out arc correctly
-- [ ] Phase 7b-3: abutted 1×32 row from 32 mac_tile macros — no row CTS,
-      traveling clock through the chain, timing closed honestly
+- [x] **Phase 7b-3: ABUTTED TRAVELING-CLOCK ROW — fourth GDS** (2026-06-11)
+      — 32 mac_tile macros pin-on-pin at exact 46.656 µm pitch, zero gap,
+      **no row CTS**: clock enters tile 0 once and travels the chain
+      (+82.34 ps/tile, STA-visible through all 32 tiles). Signoff: setup
+      **+180 ps** / hold **+48 ps** @ 250 MHz, 0 setup/hold violations,
+      **DRC clean across all 31 abutted boundaries**, 71,984 µm² @ 83%.
+      `flow/check_abutment.py` machine-verifies the TILE_SPEC invariants
+      (exact-grid, 1271 pin pairs edge-contact, pitch-integral outline).
+      Tile resized 46.656×47.52 (track-pitch quanta, TILE_SPEC §1) + rev B
+      wave matching (`set_min_delay 85` on feedthroughs). Registered drain
+      in RTL (+ STORE write-back stage), 94 tests bit-exact. The
+      false-clean trap (falling_edge clk arc → 31 tiles unconstrained) is
+      patched + documented; full story in docs/HARDENING.md
+- [ ] (7c prep) automate the lib patch inside the BLOCKS flow; per-tile
+      clock-arrival table in the report as a standing honesty check
 - [ ] Full 32×32 array GDS
 - [ ] chip_top GDS — **timing closed honestly, zero masked hold violations**
 - [ ] 2D/3D layout viewer deployed (GDS → web)

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -70,10 +70,14 @@ async def row_chain_bit_exact(dut):
     await RisingEdge(dut.clk)
 
     for j in range(N):
+        # registered drain: drive mid-cycle, value valid after the edge
+        await FallingEdge(dut.clk)
         dut.drain_slot.value = 0
         dut.drain_idx.value = j
         await RisingEdge(dut.clk)
+        await ReadOnly()
         got = int(dut.drain_out.value)
+        await RisingEdge(dut.clk)
         assert got == bits(acc[j]), \
             f"col {j}: got {got:#010x} want {bits(acc[j]):#010x}"
 
@@ -99,9 +103,12 @@ async def slots_and_columns_independent(dut):
     await RisingEdge(dut.clk)
 
     for (slot, j), want in expect.items():
+        await FallingEdge(dut.clk)
         dut.drain_slot.value = slot
         dut.drain_idx.value = j
         await RisingEdge(dut.clk)
+        await ReadOnly()
         got = int(dut.drain_out.value)
+        await RisingEdge(dut.clk)
         assert got == bits(want), \
             f"slot {slot} col {j}: {got:#010x} != {bits(want):#010x}"

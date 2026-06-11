@@ -11,7 +11,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, ReadOnly, Timer
+from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge, Timer
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -106,9 +106,12 @@ async def fetch_mma_drain_bit_exact(dut):
     ref = _ref(a, b, "e4m3").ravel()
     dut.drain_slot.value = 0
     for idx in range(M * N):
+        await FallingEdge(dut.clk)
         dut.drain_idx.value = idx
         await RisingEdge(dut.clk)
+        await ReadOnly()
         got = f32(int(dut.drain_data.value))
+        await RisingEdge(dut.clk)
         assert got == ref[idx], f"idx {idx}: {got} != {ref[idx]}"
 
 
@@ -146,6 +149,10 @@ async def accumulate_two_tiles(dut):
     ref = _ref(a1, b1, "e4m3", acc=_ref(a0, b0, "e4m3")).ravel()
     dut.drain_slot.value = 1
     for idx in range(M * N):
+        await FallingEdge(dut.clk)
         dut.drain_idx.value = idx
         await RisingEdge(dut.clk)
-        assert f32(int(dut.drain_data.value)) == ref[idx], f"idx {idx}"
+        await ReadOnly()
+        got = f32(int(dut.drain_data.value))
+        await RisingEdge(dut.clk)
+        assert got == ref[idx], f"idx {idx}"

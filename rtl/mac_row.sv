@@ -36,7 +36,7 @@ module mac_row #(
 
     input  wire [SLOT_W-1:0]      drain_slot,
     input  wire [$clog2(N)-1:0]   drain_idx,
-    output logic [31:0]           drain_out     // south
+    output logic [31:0]           drain_out     // south, REGISTERED (1 cycle)
 );
 
     // West→east traveling nets: element j drives tile j's west edge;
@@ -87,7 +87,16 @@ module mac_row #(
         end
     endgenerate
 
-    assign drain_out = drain_cell[drain_idx];
+    // Registered drain: with the traveling clock, a far tile launches its
+    // accumulator on a clock that has traveled ~3 ns east — a combinational
+    // mux→port return measured −416 ps at the row boundary (honest single-
+    // cycle failure, ASAP7 P&R). The row-top register breaks that path:
+    // late-launch→flop fits the cycle, flop→port is trivial. Drain reads
+    // are now presented one cycle after drain_idx; STORE's write-back
+    // stage absorbs the latency.
+    always_ff @(posedge clk) begin
+        drain_out <= drain_cell[drain_idx];
+    end
 
 endmodule
 
