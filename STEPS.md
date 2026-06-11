@@ -2,15 +2,18 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, after PR #14):**
-> Phases 0–6 complete. **First GDS is out**: mac_cell RTL→GDSII on ASAP7,
-> signoff clean — setup **+1928 ps** @ 250 MHz, hold **+13 ps** (0 violations,
-> real margin), **DRC clean**, 750 µm² @ 44% util. The old "needs an AVX host"
-> blocker was a misdiagnosis: the SIGILL was the image's `kepler-formal` LEC
-> binary (AVX-512), not TritonCTS — `LEC_CHECK=0` unblocks the whole flow on
-> WSL2 (~6 min/run). **Score: 89 tests green, 14 PRs merged.**
-> **Next — Phase 7:** harden the 1×N abutted row (traveling clock, see
-> docs/TILE_SPEC.md), then 32×32 array, then chip_top.
+> **▶ RESUME HERE (as of 2026-06-11, after Phase 7a):**
+> Phases 0–6 + 7a complete. **Second GDS is out — the 1×32 row**, first
+> hierarchical build: 32 `mac_cell` hard macros (ORFS BLOCKS flow) on a
+> deterministic pitch, setup **+386 ps** / hold **+438 ps** @ 250 MHz,
+> 0 setup/hold violations, **DRC clean**, 66,284 µm² @ 56% util (3 max-slew
+> pins ≤12% over lib limit — recorded honestly in docs/HARDENING.md, die in
+> 7b's re-layout). Key trap fixed: virtual-clock latency must be `-source`
+> or ORFS's post-CTS `set_propagated_clock` discards it (phantom −669 ps
+> hold wall). Runs need `ORFS_MAKE_ARGS='NUM_CORES=6'` on this 7 GB WSL2 VM.
+> **Score: 91 tests green (54 RTL + 37 Python), 14 PRs merged.**
+> **Next — Phase 7b:** traveling clock + true edge-pin abutment for the row
+> (docs/TILE_SPEC.md), then 32×32 array, then chip_top.
 > Re-verify RTL: `cd rtl/tb && make all_leaves`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
@@ -145,7 +148,21 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       accumulator and/or width-matched fp8 multiplier
 
 ## Phase 7 — Hardening: array + chip
-- [ ] Abutted row (1×32) with traveling clock
+- [x] **Phase 7a: hierarchical 1×32 row GDS** (2026-06-11) — `rtl/mac_row.sv`
+      extracted as the physical tiling unit (mac_array now stamps M rows;
+      bit-exact, 91 tests green incl. 2 new row TBs); `mac_cell` consumed as
+      a hard macro via ORFS `BLOCKS` (M1–M5 macro / M6–M7 parent layer
+      split); deterministic `place_macro` row pitch. Signoff: setup +386 ps /
+      hold +438 ps @ 250 MHz, 0 setup/hold violations, DRC clean, 66,284 µm²
+      @ 56% util. 3 max-slew pins ≤39 ps over lib limit recorded honestly
+      (HARDENING.md) — die in 7b's re-layout
+- [x] Found + documented the virtual-clock trap: vclk latency must be
+      `-source` or post-CTS `set_propagated_clock` reverts it to ideal
+      (phantom −669 ps hold wall, CTS buffer-cap death)
+- [x] vclk honesty check exercised: model tightened 1150 → 750 ps to match
+      measured insertion (~710 ps), hold re-closed ~400 ps harder
+- [ ] Phase 7b: row with **traveling clock** + true edge-pin abutment
+      (TILE_SPEC contract: clk west→east, fixed outline, edge power)
 - [ ] Full 32×32 array GDS
 - [ ] chip_top GDS — **timing closed honestly, zero masked hold violations**
 - [ ] 2D/3D layout viewer deployed (GDS → web)

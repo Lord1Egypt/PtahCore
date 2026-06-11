@@ -49,8 +49,13 @@ ifeq ($(TOP),store)
   VERILOG_SOURCES = $(RTL)/fp8_encode.sv $(RTL)/store.sv
   MODULE = test_load_store
 endif
+ifeq ($(TOP),mac_row)
+  VERILOG_SOURCES = $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_row.sv
+  MODULE = test_mac_row
+  COMPILE_ARGS += -GN=4
+endif
 ifeq ($(TOP),mac_array)
-  VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_array.sv
+  VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_row.sv $(RTL)/mac_array.sv
   MODULE = test_mac_array
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
 endif
@@ -59,15 +64,15 @@ ifeq ($(TOP),cmdproc_tb_top)
   MODULE = test_cmdproc
 endif
 ifeq ($(TOP),mma_unit)
-  VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_array.sv $(RTL)/mma_unit.sv
+  VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_row.sv $(RTL)/mac_array.sv $(RTL)/mma_unit.sv
   MODULE = test_mma_unit
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
 endif
 ifeq ($(TOP),chip_top)
   VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp8_encode.sv $(RTL)/fp32_mul.sv \
-    $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_array.sv $(RTL)/mma_unit.sv \
-    $(RTL)/smem.sv $(RTL)/barrier.sv $(RTL)/load.sv $(RTL)/store.sv \
-    $(RTL)/cmdproc.sv $(RTL)/chip_top.sv
+    $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_row.sv $(RTL)/mac_array.sv \
+    $(RTL)/mma_unit.sv $(RTL)/smem.sv $(RTL)/barrier.sv $(RTL)/load.sv \
+    $(RTL)/store.sv $(RTL)/cmdproc.sv $(RTL)/chip_top.sv
   MODULE = test_chip_top
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
 endif

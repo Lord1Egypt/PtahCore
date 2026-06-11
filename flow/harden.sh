@@ -24,6 +24,11 @@ echo "▶ Hardening '${DESIGN}' on ASAP7 via ${IMAGE}"
 echo "  repo : ${REPO}"
 echo "  cfg  : ${CFG}"
 
+# Extra make variables, e.g. ORFS_MAKE_ARGS='NUM_CORES=6' to cap OpenROAD
+# threads (detailed route memory scales with workers — 12 threads OOMs the
+# 7 GB WSL2 VM on the 1×32 row; 6 fits).
+MAKE_ARGS="${ORFS_MAKE_ARGS:-}"
+
 DOCKER_CONFIG="${DOCKER_CONFIG_DIR}" docker run --rm \
     -v "${REPO}:/work" \
     -e PTAHCORE=/work \
@@ -33,5 +38,6 @@ DOCKER_CONFIG="${DOCKER_CONFIG_DIR}" docker run --rm \
         source /OpenROAD-flow-scripts/env.sh 2>/dev/null || true
         make DESIGN_CONFIG=${CFG} \
              WORK_HOME=/work/flow \
+             ${MAKE_ARGS} \
         && echo '✅ harden finished — see flow/results/'
     "

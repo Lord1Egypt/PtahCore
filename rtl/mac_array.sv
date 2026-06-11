@@ -80,22 +80,33 @@ module mac_array #(
     assign cell_en   = busy && (k_q < 32'(K));
     assign cell_zero = busy && accum_q == 1'b0 && (k_q == '0);
 
-    logic [31:0] drain_grid [M*N];
+    // B operands flattened once for every row's north edge.
+    logic [N*32-1:0] b_bus;
+    always_comb begin
+        for (int j = 0; j < N; j++)
+            b_bus[j*32 +: 32] = b_f32[j];
+    end
+
+    // drain_idx is row-major (i*N + j); N is a power of two, so the low
+    // $clog2(N) bits select the column inside a row and the high bits
+    // select the row — the same mux the flat grid had, split in two.
+    localparam int NW = $clog2(N);
+    logic [31:0] drain_row [M];
     generate
         for (gi = 0; gi < M; gi++) begin : row
-            for (gj = 0; gj < N; gj++) begin : col
-                mac_cell #(.TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W)) u_cell (
-                    .clk(clk), .rst(rst),
-                    .en(cell_en), .zero(cell_zero), .slot(slot_q),
-                    .a_f32(a_f32[gi]), .b_f32(b_f32[gj]),
-                    .drain_slot(drain_slot),
-                    .drain_out(drain_grid[gi*N + gj])
-                );
-            end
+            mac_row #(.N(N), .TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W)) u_row (
+                .clk(clk), .rst(rst),
+                .en(cell_en), .zero(cell_zero), .slot(slot_q),
+                .a_f32(a_f32[gi]),
+                .b_f32_flat(b_bus),
+                .drain_slot(drain_slot),
+                .drain_idx(drain_idx[NW-1:0]),
+                .drain_out(drain_row[gi])
+            );
         end
     endgenerate
 
-    assign drain_data = drain_grid[drain_idx];
+    assign drain_data = drain_row[drain_idx[$clog2(M*N)-1:NW]];
 
     // ── FSM ──────────────────────────────────────────────────────────
     always_ff @(posedge clk) begin

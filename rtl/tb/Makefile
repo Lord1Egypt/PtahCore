@@ -29,6 +29,7 @@ all_leaves:
 	$(MAKE) sim TOP=barrier
 	$(MAKE) sim TOP=load
 	$(MAKE) sim TOP=store
+	$(MAKE) sim TOP=mac_row
 	$(MAKE) sim TOP=mac_array
 	$(MAKE) sim TOP=cmdproc_tb_top
 	$(MAKE) sim TOP=mma_unit
