@@ -37,7 +37,8 @@ Design configs live in `flow/designs/asap7/<block>/`:
 |-------|--------|-------|------------|------------|------|------|-------|
 | `mac_cell` (pipelined mul \| add) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+1928 ps** | **+13 ps** | **750 µm²** | 44% | signoff: 0 setup / 0 hold / 0 slew / 0 cap / 0 fanout violations, **DRC clean**; crit path ~2.07 ns → ~480 MHz capable |
 | row (1×32, hierarchical) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+386 ps** | **+438 ps** | **66,284 µm²** | 56% | 32 `mac_cell` hard macros (BLOCKS flow) + drain mux/broadcast stdcells; 0 setup / 0 hold / 0 cap / 0 fanout, **DRC clean**; ⚠ 3 max-slew pins ≤39 ps over the 320 ps lib limit (see below — recorded, not waived) |
-| row (1×N, traveling clock) | ⬜ | — | — | — | — | — | Phase 7b |
+| `mac_tile` (abutment tile) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+1620 ps** | **+15 ps** | **773 µm²** | 39% | fixed 46.44×46.44 µm site-aligned outline; **0 violations of any type, DRC clean**; all 73 mirrored pin pairs verified coordinate-exact in the DEF; feedthrough arcs: A ~84–98 ps ≈ clk ~89 ps (traveling clock matched to the data wave by construction); internal clock insertion 54–70 ps |
+| row (1×N, traveling clock) | ⬜ | — | — | — | — | — | Phase 7b-3 |
 | array (32×32) | ⬜ | — | — | — | — | — | — |
 | `chip_top` | ⬜ | — | — | — | — | — | — |
 
@@ -157,6 +158,32 @@ the *actual* slews, so the +386/+438 slack already absorbs them; the
 remaining risk is lib-extrapolation accuracy on 3 arcs, not function. The
 row top's routing is redone in 7b (traveling clock + true edge abutment),
 which is where these die for real.
+
+## Third GDS — `mac_tile`, the tile that actually abuts (Phase 7b-2)
+
+The TILE_SPEC contract, in silicon:
+
+- **Fixed outline**: 46.44 × 46.44 µm — 860 sites × 172 rows, integral both
+  ways, so abutted tiles land on-grid by construction.
+- **Pins on the edges that carry them**, via OpenROAD's
+  `set_io_pin_constraint -mirrored_pins`: every west-in mirrors its east-out
+  (same y) and every north-in its south-out (same x). All **73 pairs verified
+  coordinate-exact** against the final DEF — cell j's `a_out[k]` lands on
+  cell j+1's `a_in[k]` pin-on-pin. Alignment is the constraint, not placer
+  luck.
+- **Traveling clock**: `clk_in` (west) → `clk_out` (east). The characterised
+  `.lib` shows the clock feedthrough at **~89 ps** and the A-data
+  feedthrough at **~84–98 ps** — the clock and the data wave cross the tile
+  together, which is the whole point: at row scale the wave costs nothing
+  because every tile's capture clock arrives just as its data does.
+- **Layer split**: tile keeps M1–M5, parent gets M6–M7 (BLOCK PDN grid).
+
+Signoff: **setup +1620 ps / hold +15 ps @ 250 MHz, zero violations of any
+type, DRC clean**, 773 µm² @ 39% util. One open item for 7b-3:
+`write_timing_model` encodes the `clk_in→clk_out` arc with a `falling_edge`
+type and a negative rise reference — the row STA must be checked to consume
+it correctly (the `min/max_clock_tree_path` entries, 54–70 ps, carry the
+internal insertion).
 
 ## Failure log
 

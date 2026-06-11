@@ -171,10 +171,14 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       stack). mac_row = pure west→east tile chain; mac_array/mma_unit/
       chip_top untouched. Bit-exact: **94 tests** (57 RTL + 37 Python),
       3 new tile TBs (feedthroughs, drain chain select, wrapped-core MAC)
-- [ ] Phase 7b-2: harden mac_tile with edge pin constraints (clk_in west /
-      clk_out east same y, A/ctrl west→east, B+drain north→south, fixed
-      outline) + characterised clk_in→clk_out insertion matched to the data
-      feedthrough delay
+- [x] **Phase 7b-2: mac_tile hardened — third GDS** (2026-06-11) — fixed
+      46.44×46.44 µm site-aligned outline; all 73 mirrored pin pairs
+      (west↔east, north↔south) verified coordinate-exact in the DEF;
+      signoff +1620 ps setup / +15 ps hold, **zero violations of any type**,
+      DRC clean, 773 µm² @ 39%. Characterised .lib: clk feedthrough ~89 ps ≈
+      A feedthrough ~84–98 ps — traveling clock matched to the data wave by
+      construction. Open for 7b-3: verify row STA consumes the
+      falling_edge-encoded clk_in→clk_out arc correctly
 - [ ] Phase 7b-3: abutted 1×32 row from 32 mac_tile macros — no row CTS,
       traveling clock through the chain, timing closed honestly
 - [ ] Full 32×32 array GDS
