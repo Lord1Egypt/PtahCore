@@ -54,3 +54,10 @@ export HOLD_SLACK_MARGIN = 15
 # Pre-bank post-route RC erosion at the repair stages (7a lesson).
 export SETUP_SLACK_MARGIN = 100
 export SLEW_MARGIN = 30
+
+# The congestion-resolution loop in global route exhausted the 7 GB
+# WSL2 VM (Error 247 at extra-iteration 3/30) while post-CTS timing was
+# already fully closed (+1143/+32, TNS 0). Most of the die is abutted
+# pin-on-pin connections with no real routing demand; let GRT hand its
+# (local) congestion to detailed route instead of resolving it in-core.
+export GRT_ALLOW_CONGESTION = 1
