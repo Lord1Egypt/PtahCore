@@ -2,25 +2,26 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, Phase 7c IN PROGRESS, branch
-> `feat/phase7c-array-rtl`):** PR #18 merged (18 PRs). docs/ARRAY_SPEC.md
-> = the 2D wave contract. **7c-1 RTL DONE:** rtl/mac_grid.sv (M×N tile
-> sea + south drain strip), mac_array re-plumbed on it (mac_row.sv kept
-> as the 7b-3 artifact), STORE row-change settle bubble (+M cycles per
-> burst) + pymodel twin; ALL GREEN: 16 RTL units (58 results, incl. 3
-> new mac_grid TBs) + 37 Python. Packed chain arrays (Verilator 5.020
-> false UNOPTFLAT on 2D unpacked; split_var can't split multi-dim).
-> **7c-2 flow files DONE (unrun):** flow/designs/asap7/mac_grid/
-> {config.mk, constraint.sdc (per-row clocks, δs=150 ps stagger TO BE
-> TUNED to measured in-context arcs, settled-bus multicycle -through
-> row 31 drain pins), gen_floorplan.py → macro_place.tcl (1024 macros,
-> row 0 at TOP) + io_constraints.tcl, pdn.tcl, mac_tile/config.mk} +
-> flow/harden_grid.sh (block→abstract→clk-arc patch→grid).
-> **Next — 7c-3:** run `ORFS_MAKE_ARGS='NUM_CORES=6'
-> flow/harden_grid.sh` (hours; tile rebuild ~6 min + 1024-macro P&R),
-> iterate δs against measured b/drain arcs, extend
-> flow/check_abutment.py to 2D grids, per-tile clock-arrival honesty
-> table, HARDENING.md results, then PR.
+> **▶ RESUME HERE (as of 2026-06-11, Phase 7c-3 RUNNING, branch
+> `feat/phase7c3-grid-harden`):** PR #19 MERGED (19 PRs) = 7c-1 RTL +
+> 7c-2 flow design. On this branch since: flow/report_clock_table.py
+> (per-tile clock-arrival honesty check — VALIDATED on 7b-3 row: exact
+> +82.34 ps/tile, 32 tiles monotonic) + drain_n_flat made a north-edge
+> port (tie cells can't cross the tile sea; SDC false-path, grid 3/3 +
+> array 4/4 + elab green). **The grid harden is RUNNING detached:**
+> `setsid nohup flow/harden_grid.sh` → log /tmp/grid_harden.log
+> (block+abstract+clk-arc patch DONE; stage 3 = 1024-macro mac_grid
+> P&R in progress, NUM_CORES=6, expect hours). If dead after /clear:
+> check `tail /tmp/grid_harden.log`, `docker ps`; results land in
+> flow/{results,reports,logs}/asap7/mac_grid/base/. After it finishes:
+> 6_finish.rpt (setup/hold/slew), 5_route_drc.rpt (empty=clean), then
+> `python3 flow/check_abutment.py --def flow/results/asap7/mac_grid/base/6_final.def
+> --lef flow/results/asap7/mac_grid_mac_tile/base/mac_tile.lef --cols 32
+> --rows 32 --x0 2.16 --y0 12.96` and
+> `python3 flow/report_clock_table.py --design mac_grid --cols 32 --rows 32`
+> (arrivals must grow ~δe/col AND ~δs/row; δs=150 in SDC is an INITIAL
+> GUESS — tune to measured southbound arcs + re-run if hold/setup
+> complains). Then HARDENING.md + STEPS results, docs/img renders, PR.
 > Re-verify RTL: `cd rtl/tb && make all_leaves`; Python: `pytest golden pymodel -q`.
 >
 > *(previous checkpoint, after Phase 7b-3):*
