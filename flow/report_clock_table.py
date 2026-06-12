@@ -117,17 +117,25 @@ def main():
         if m:
             arrivals[(r, c)] = float(m[-1][1])
     fails = 0
-    print(f"{'tile':>10s} {'clk arrival (ps)':>18s} {'Δ prev col':>12s}")
+    print(f"{'tile':>10s} {'clk arrival (ps)':>18s} {'Δ prev col':>12s} "
+          f"{'Δ prev row':>12s}")
+    # monotonic along BOTH axes, but only vs a sampled predecessor on
+    # that axis (diagonal samples in otherwise-unsampled rows have no
+    # same-row predecessor — flagging those was a checker artifact).
     prev_by_row = {}
+    prev_by_col = {}
     for (r, c) in sorted(arrivals):
         a = arrivals[(r, c)]
-        d = a - prev_by_row[r] if r in prev_by_row else 0.0
+        dc = a - prev_by_row[r] if r in prev_by_row else None
+        dr = a - prev_by_col[c] if c in prev_by_col else None
         prev_by_row[r] = a
+        prev_by_col[c] = a
         flag = ""
-        if c > 0 and d <= 0:
+        if (dc is not None and dc <= 0) or (dr is not None and dr <= 0):
             flag = "  NON-MONOTONIC"
             fails += 1
-        print(f"({r:3d},{c:3d}) {a:18.2f} {d:12.2f}{flag}")
+        fmt = lambda d: f"{d:12.2f}" if d is not None else f"{'-':>12s}"
+        print(f"({r:3d},{c:3d}) {a:18.2f} {fmt(dc)} {fmt(dr)}{flag}")
     missing = [t[:2] for t in insts if t[:2] not in arrivals]
     if missing:
         print(f"MISSING arrivals (unconstrained?): {missing}")

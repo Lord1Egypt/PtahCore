@@ -2,65 +2,31 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-12 ~07:15, Phase 7c-3, branch
-> `feat/phase7c3-grid-harden`):** swap bump WORKED (15.6 GB live; GRT
-> peaked ~11.6 GB and survived) — and then the run died at the END of
-> 5_1: post-GR `repair_design` inserted **15,103 buffers** that cannot
-> legalize in the macro sea (DPL-0036, 4,667 unplaced). Root cause was
-> REAL, not phantom: ORFS `buffer_ports` (3,333 cells at 3_3) can only
-> legalize in the south strip, turning every pin-adjacent port into a
-> ~1.5 mm detour — 8,633 real setup violations (ws −9.3 ns) visible in
-> 4_cts_final.rpt (worst: b_n_flat → input1425, 267 fF / 14.6 ns slew).
-> FIX (this checkpoint): `DONT_BUFFER_PORTS = 1` in config.mk +
-> `set_driving_cell` port-drive contracts in gen_constraints.py
-> (BUFx4 data / BUFx24 clocks — no ideal zero-slew ports; chip_top
-> implements the drivers physically in 7d). mac_grid artifacts wiped;
-> full re-run from synth launched (~3 min to placement on the blackbox
-> sea). **STA-readout trap:** `report_checks` prints one path PER CLOCK
-> GROUP (33 groups) — a truncated tail shows only clk_8/clk_9 and reads
-> "+1359 MET" while clk_0 is −9.3 ns; always use `report_worst_slack`
-> first. **To resume after a crash** (docker must be running):
-> ```
-> cd /home/lordegypt/ptahcore
-> setsid nohup bash -c "DOCKER_CONFIG=/tmp/dockercfg ORFS_MAKE_ARGS=\"NUM_CORES=6\" flow/harden_grid.sh; echo HARDEN_EXIT=\$?" > /tmp/grid_harden.log 2>&1 &
-> tail -f /tmp/grid_harden.log
-> ```
-> (config.mk's GLOBAL_ROUTE_ARGS caps congestion iterations at 2; with
-> the 16 GB swap no runtime override is needed. If 5_1 repair_design
-> still DPL-0036s, the escape hatch is ORFS_MAKE_ARGS
-> SKIP_INCREMENTAL_REPAIR=1 — setup has >1 ns contract margin and hold
-> is positive by construction, but try the real repair first.)
-> Flow: synth→CTS (~25 min), 5_1 GRT (~10 min + repair), 5_2 detailed
-> route (hours), 6_finish. **After success:** check 6_finish.rpt (setup/hold/slew) +
-> 5_route_drc.rpt (empty = clean), then
-> `python3 flow/check_abutment.py --def flow/results/asap7/mac_grid/base/6_final.def
-> --lef flow/results/asap7/mac_grid_mac_tile/base/mac_tile.lef --cols 32
-> --rows 32 --x0 2.16 --y0 12.96` and
-> `python3 flow/report_clock_table.py --design mac_grid --cols 32 --rows 32`
-> (arrivals must grow ~85 ps/row + ~82.34 ps/col, monotonic, none
-> missing). Then: HARDENING.md results section + failure-log rows for
-> the GRT OOM saga, STEPS tick, docs/img renders (`make gui_final` via
-> WSLg; headless save_image doesn't work), PR.
+> **▶ RESUME HERE (as of 2026-06-12 ~08:00, Phase 7c COMPLETE on branch
+> `feat/phase7c3-grid-harden`, PR pending):**
+> Phases 0–7c done — **FIVE GDS out**, and the headline is the
+> **32×32 ABUTTED ARRAY**: 1024 mac_tile macros pin-on-pin, no array
+> CTS, the clock traveling +82.35 ps/col east and +85 ps/row south,
+> STA-visible post-route corner to corner (+152 ps → +5,340 ps).
+> Signoff @ 250 MHz, routed SPEF: setup **+1156 ps** / hold **+435 ps**,
+> TNS 0 both, 0 setup/hold/cap/fanout violations, **DRC clean**,
+> 2,270,706 µm² @ 99%, ⚠ 1 max-slew pin +5.13 ps recorded-not-waived.
+> `check_abutment.py`: 1024 tiles exact-grid, 104,160 pin pairs
+> coordinate-exact. `report_clock_table.py`: monotonic both axes.
+> Full RTL→GDSII ≈ 33 min (6 threads, 16 GB swap — GRT peaks ~11.6 GB).
+> Build: `DOCKER_CONFIG=/tmp/dockercfg ORFS_MAKE_ARGS="NUM_CORES=6"
+> flow/harden_grid.sh` (block → abstract → clk-arc patch → grid; the
+> patch step is MANDATORY, see HARDENING.md false-clean trap).
+> This phase's traps (all in docs/HARDENING.md failure log): GRT OOM →
+> 16 GB swap; **port-buffer trap** → `DONT_BUFFER_PORTS=1` +
+> set_driving_cell contracts; **STA readout trap** → report_worst_slack
+> first (report_checks shows one path per clock group — 33 here).
+> **Score: 95 tests green (58 RTL + 37 Python), 19 PRs merged.**
+> **Next — Phase 7d:** `chip_top` GDS — array + cmdproc/smem/barrier/
+> load/store macros, the traveling clock + port drivers (BUFx4/BUFx24
+> contracts) implemented physically at chip level. Then 7e: GDS web
+> viewer.
 > Re-verify RTL: `cd rtl/tb && make all_leaves`; `pytest golden pymodel -q`.
->
-> *(previous checkpoint, after Phase 7b-3):*
-> Phases 0–7b complete — **four GDS out**: mac_cell, hierarchical row,
-> mac_tile, and the headline: **the ABUTTED TRAVELING-CLOCK ROW** — 32
-> tiles pin-on-pin, zero gap, NO row CTS, clock marching +82.34 ps/tile,
-> setup **+180 ps** / hold **+48 ps** @ 250 MHz, 0 violations, DRC clean
-> across all 31 abutted boundaries. This is the clocking thesis autogpu
-> never closed, proven at row scale. Build with
-> `ORFS_MAKE_ARGS='NUM_CORES=6' flow/harden_abutted_row.sh` (orchestrates
-> block → abstract → clk-arc patch → row; the patch step is MANDATORY —
-> without it 31 of 32 tiles are silently unconstrained, see HARDENING.md).
-> Verify with `flow/check_abutment.py`. Drain is now REGISTERED at the
-> row boundary (+1 cycle STORE latency, 94 tests bit-exact).
-> **Score: 94 tests green (57 RTL + 37 Python), 17 PRs merged.**
-> **Next — Phase 7c:** the 32×32 array — stack 32 rows by vertical
-> abutment (height quantum already baked in), traveling B delivery along
-> the north edge (the SDC contract the row already models), drain chains
-> south, row decoders. Then 7d chip_top.
-> Re-verify RTL: `cd rtl/tb && make all_leaves`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
@@ -236,9 +202,24 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       in RTL (+ STORE write-back stage), 94 tests bit-exact. The
       false-clean trap (falling_edge clk arc → 31 tiles unconstrained) is
       patched + documented; full story in docs/HARDENING.md
-- [ ] (7c prep) automate the lib patch inside the BLOCKS flow; per-tile
-      clock-arrival table in the report as a standing honesty check
-- [ ] Full 32×32 array GDS
+- [x] (7c prep) lib patch automated in `flow/harden_grid.sh` (block →
+      abstract → patch → grid); `flow/report_clock_table.py` is the
+      standing per-tile clock-arrival honesty check (2D, both axes)
+- [x] **Phase 7c: 32×32 ABUTTED ARRAY — fifth GDS** (2026-06-12) —
+      **1024 mac_tile macros pin-on-pin, no array CTS**: clock travels
+      +82.35 ps/col east and +85 ps/row south (the spine contract),
+      both waves STA-visible post-route corner to corner (+152 ps at
+      tile (0,0) → +5,340 ps at (31,31)). Signoff @ 250 MHz, routed
+      SPEF: setup **+1156 ps** / hold **+435 ps**, TNS 0 both,
+      0 setup/hold/cap/fanout violations, **DRC clean**, 2,270,706 µm²
+      @ 99%; 1 max-slew pin +5.13 ps over recorded-not-waived.
+      `check_abutment.py`: 1024 tiles exact-grid, **104,160 abutted pin
+      pairs coordinate-exact**. Hold is positive by construction
+      (per-bit pre-delay contracts + early spine tap, gen_constraints.py)
+      with ZERO repair buffers in the macro sea. Battles won this phase:
+      GRT OOM (→16 GB swap), the port-buffer trap (`DONT_BUFFER_PORTS=1`
+      + set_driving_cell contracts), the per-clock-group STA readout
+      trap — all in docs/HARDENING.md. Full RTL→GDSII ≈ 33 min.
 - [ ] chip_top GDS — **timing closed honestly, zero masked hold violations**
 - [ ] 2D/3D layout viewer deployed (GDS → web)
 
