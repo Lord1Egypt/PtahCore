@@ -42,6 +42,15 @@ set_min_delay $ft_min -from [get_ports drain_slot_in] -to [get_ports drain_slot_
 set_min_delay $ft_min -from [get_ports row_hit_in]    -to [get_ports row_hit_out]
 set_min_delay $ft_min -from [get_ports a_in]          -to [get_ports a_out]
 
+# (Rev C tried the same floors on the vertical feedthroughs — measured
+# no-op: port-to-port set_min_delay has no clocked endpoint, so no
+# repair stage inserts delay for it; the rev-B floors above also never
+# changed the netlist (libs byte-identical). The west wave actually
+# closed at ROW level via parent-side pre-delay buffers, and the grid
+# can't buffer between abutted macros at all — so vertical wave safety
+# is a PER-BIT delivery contract at the grid boundary instead:
+# flow/designs/asap7/mac_grid/gen_constraints.py.)
+
 # Reset is a slow, globally-distributed signal — exclude from timing
 # (rst_out is its feedthrough continuation).
 set_false_path -from [get_ports rst_in]

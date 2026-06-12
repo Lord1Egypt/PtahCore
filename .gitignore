@@ -18,3 +18,4 @@ flow/results/
 flow/logs/
 flow/objects/
 flow/reports/
+.tmp_sta/

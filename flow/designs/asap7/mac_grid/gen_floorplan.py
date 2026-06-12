@@ -75,6 +75,7 @@ def gen_io_constraints() -> str:
     for j in range(N):
         x1, x2 = X0 + j * TILE_W, X0 + (j + 1) * TILE_W
         pins = [f"b_n_flat[{j * 32 + b}]" for b in range(32)]
+        pins += [f"drain_n_flat[{j * 32 + b}]" for b in range(32)]
         out.append(
             "set_io_pin_constraint -pin_names {%s} -region top:%.3f-%.3f"
             % (" ".join("{%s}" % p for p in pins), x1, x2))

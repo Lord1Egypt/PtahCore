@@ -2,45 +2,31 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-11, Phase 7c IN PROGRESS, branch
-> `feat/phase7c-array-rtl`):** PR #18 merged (18 PRs). docs/ARRAY_SPEC.md
-> = the 2D wave contract. **7c-1 RTL DONE:** rtl/mac_grid.sv (M×N tile
-> sea + south drain strip), mac_array re-plumbed on it (mac_row.sv kept
-> as the 7b-3 artifact), STORE row-change settle bubble (+M cycles per
-> burst) + pymodel twin; ALL GREEN: 16 RTL units (58 results, incl. 3
-> new mac_grid TBs) + 37 Python. Packed chain arrays (Verilator 5.020
-> false UNOPTFLAT on 2D unpacked; split_var can't split multi-dim).
-> **7c-2 flow files DONE (unrun):** flow/designs/asap7/mac_grid/
-> {config.mk, constraint.sdc (per-row clocks, δs=150 ps stagger TO BE
-> TUNED to measured in-context arcs, settled-bus multicycle -through
-> row 31 drain pins), gen_floorplan.py → macro_place.tcl (1024 macros,
-> row 0 at TOP) + io_constraints.tcl, pdn.tcl, mac_tile/config.mk} +
-> flow/harden_grid.sh (block→abstract→clk-arc patch→grid).
-> **Next — 7c-3:** run `ORFS_MAKE_ARGS='NUM_CORES=6'
-> flow/harden_grid.sh` (hours; tile rebuild ~6 min + 1024-macro P&R),
-> iterate δs against measured b/drain arcs, extend
-> flow/check_abutment.py to 2D grids, per-tile clock-arrival honesty
-> table, HARDENING.md results, then PR.
-> Re-verify RTL: `cd rtl/tb && make all_leaves`; Python: `pytest golden pymodel -q`.
->
-> *(previous checkpoint, after Phase 7b-3):*
-> Phases 0–7b complete — **four GDS out**: mac_cell, hierarchical row,
-> mac_tile, and the headline: **the ABUTTED TRAVELING-CLOCK ROW** — 32
-> tiles pin-on-pin, zero gap, NO row CTS, clock marching +82.34 ps/tile,
-> setup **+180 ps** / hold **+48 ps** @ 250 MHz, 0 violations, DRC clean
-> across all 31 abutted boundaries. This is the clocking thesis autogpu
-> never closed, proven at row scale. Build with
-> `ORFS_MAKE_ARGS='NUM_CORES=6' flow/harden_abutted_row.sh` (orchestrates
-> block → abstract → clk-arc patch → row; the patch step is MANDATORY —
-> without it 31 of 32 tiles are silently unconstrained, see HARDENING.md).
-> Verify with `flow/check_abutment.py`. Drain is now REGISTERED at the
-> row boundary (+1 cycle STORE latency, 94 tests bit-exact).
-> **Score: 94 tests green (57 RTL + 37 Python), 17 PRs merged.**
-> **Next — Phase 7c:** the 32×32 array — stack 32 rows by vertical
-> abutment (height quantum already baked in), traveling B delivery along
-> the north edge (the SDC contract the row already models), drain chains
-> south, row decoders. Then 7d chip_top.
-> Re-verify RTL: `cd rtl/tb && make all_leaves`.
+> **▶ RESUME HERE (as of 2026-06-12 ~08:00, Phase 7c COMPLETE on branch
+> `feat/phase7c3-grid-harden`, PR pending):**
+> Phases 0–7c done — **FIVE GDS out**, and the headline is the
+> **32×32 ABUTTED ARRAY**: 1024 mac_tile macros pin-on-pin, no array
+> CTS, the clock traveling +82.35 ps/col east and +85 ps/row south,
+> STA-visible post-route corner to corner (+152 ps → +5,340 ps).
+> Signoff @ 250 MHz, routed SPEF: setup **+1156 ps** / hold **+435 ps**,
+> TNS 0 both, 0 setup/hold/cap/fanout violations, **DRC clean**,
+> 2,270,706 µm² @ 99%, ⚠ 1 max-slew pin +5.13 ps recorded-not-waived.
+> `check_abutment.py`: 1024 tiles exact-grid, 104,160 pin pairs
+> coordinate-exact. `report_clock_table.py`: monotonic both axes.
+> Full RTL→GDSII ≈ 33 min (6 threads, 16 GB swap — GRT peaks ~11.6 GB).
+> Build: `DOCKER_CONFIG=/tmp/dockercfg ORFS_MAKE_ARGS="NUM_CORES=6"
+> flow/harden_grid.sh` (block → abstract → clk-arc patch → grid; the
+> patch step is MANDATORY, see HARDENING.md false-clean trap).
+> This phase's traps (all in docs/HARDENING.md failure log): GRT OOM →
+> 16 GB swap; **port-buffer trap** → `DONT_BUFFER_PORTS=1` +
+> set_driving_cell contracts; **STA readout trap** → report_worst_slack
+> first (report_checks shows one path per clock group — 33 here).
+> **Score: 95 tests green (58 RTL + 37 Python), 19 PRs merged.**
+> **Next — Phase 7d:** `chip_top` GDS — array + cmdproc/smem/barrier/
+> load/store macros, the traveling clock + port drivers (BUFx4/BUFx24
+> contracts) implemented physically at chip level. Then 7e: GDS web
+> viewer.
+> Re-verify RTL: `cd rtl/tb && make all_leaves`; `pytest golden pymodel -q`.
 
 ## Phase 0 — Scaffold ✅ (2026-06-10, PR #1)
 - [x] Choose name (PtahCore) + verify availability
@@ -216,9 +202,24 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       in RTL (+ STORE write-back stage), 94 tests bit-exact. The
       false-clean trap (falling_edge clk arc → 31 tiles unconstrained) is
       patched + documented; full story in docs/HARDENING.md
-- [ ] (7c prep) automate the lib patch inside the BLOCKS flow; per-tile
-      clock-arrival table in the report as a standing honesty check
-- [ ] Full 32×32 array GDS
+- [x] (7c prep) lib patch automated in `flow/harden_grid.sh` (block →
+      abstract → patch → grid); `flow/report_clock_table.py` is the
+      standing per-tile clock-arrival honesty check (2D, both axes)
+- [x] **Phase 7c: 32×32 ABUTTED ARRAY — fifth GDS** (2026-06-12) —
+      **1024 mac_tile macros pin-on-pin, no array CTS**: clock travels
+      +82.35 ps/col east and +85 ps/row south (the spine contract),
+      both waves STA-visible post-route corner to corner (+152 ps at
+      tile (0,0) → +5,340 ps at (31,31)). Signoff @ 250 MHz, routed
+      SPEF: setup **+1156 ps** / hold **+435 ps**, TNS 0 both,
+      0 setup/hold/cap/fanout violations, **DRC clean**, 2,270,706 µm²
+      @ 99%; 1 max-slew pin +5.13 ps over recorded-not-waived.
+      `check_abutment.py`: 1024 tiles exact-grid, **104,160 abutted pin
+      pairs coordinate-exact**. Hold is positive by construction
+      (per-bit pre-delay contracts + early spine tap, gen_constraints.py)
+      with ZERO repair buffers in the macro sea. Battles won this phase:
+      GRT OOM (→16 GB swap), the port-buffer trap (`DONT_BUFFER_PORTS=1`
+      + set_driving_cell contracts), the per-clock-group STA readout
+      trap — all in docs/HARDENING.md. Full RTL→GDSII ≈ 33 min.
 - [ ] chip_top GDS — **timing closed honestly, zero masked hold violations**
 - [ ] 2D/3D layout viewer deployed (GDS → web)
 

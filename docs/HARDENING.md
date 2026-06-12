@@ -39,7 +39,7 @@ Design configs live in `flow/designs/asap7/<block>/`:
 | row (1×32, hierarchical) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+386 ps** | **+438 ps** | **66,284 µm²** | 56% | 32 `mac_cell` hard macros (BLOCKS flow) + drain mux/broadcast stdcells; 0 setup / 0 hold / 0 cap / 0 fanout, **DRC clean**; ⚠ 3 max-slew pins ≤39 ps over the 320 ps lib limit (see below — recorded, not waived) |
 | `mac_tile` (abutment tile) | ✅ **GDS complete** | 250 MHz (4000 ps) | **+1620 ps** | **+15 ps** | **773 µm²** | 39% | fixed 46.44×46.44 µm site-aligned outline; **0 violations of any type, DRC clean**; all 73 mirrored pin pairs verified coordinate-exact in the DEF; feedthrough arcs: A ~84–98 ps ≈ clk ~89 ps (traveling clock matched to the data wave by construction); internal clock insertion 54–70 ps |
 | **row (1×32, ABUTTED + traveling clock)** | ✅ **GDS complete** | 250 MHz (4000 ps) | **+180 ps** | **+48 ps** | **71,984 µm²** | 83% | **no row CTS** — the clock enters tile 0 once and travels the chain (+82.34 ps/tile, STA-visible through all 32 tiles); 0 setup / 0 hold / 0 cap / 0 fanout, **DRC clean incl. all 31 abutted boundaries**; `check_abutment.py`: 32 tiles exact-grid, 1271 pin pairs edge-contact; ⚠ 2 max-slew pins ≤2.8 ps over (route-erosion tail, recorded) |
-| array (32×32) | ⬜ | — | — | — | — | — | — |
+| **array (32×32, ABUTTED 2D traveling clock)** | ✅ **GDS complete** | 250 MHz (4000 ps) | **+1156 ps** | **+435 ps** | **2,270,706 µm²** | 99% | **1024 `mac_tile` macros pin-on-pin, no array CTS** — clock enters each row's west port once and travels +82.35 ps/col east; rows staggered +85 ps south (spine contract); both waves STA-visible post-route through all sampled tiles; 0 setup / 0 hold / 0 cap / 0 fanout, **DRC clean**; `check_abutment.py`: 1024 tiles exact-grid, **104,160 abutted pin pairs coordinate-exact**; ⚠ 1 max-slew pin 5.13 ps over (route-erosion tail, recorded); full RTL→GDSII ≈ 33 min on 6 WSL2 threads |
 | `chip_top` | ⬜ | — | — | — | — | — | — |
 
 _(Pre-layout generic-gate area baselines are in docs/SYNTHESIS.md.)_
@@ -248,6 +248,56 @@ per-column B input delays (`io_delay + j × 82.34 ps`); a flat delay
 would manufacture a ~2.5 ns phantom hold wall the real array never
 produces. Phase 7c implements that delivery physically.
 
+## Fifth GDS — the 32×32 abutted array (Phase 7c)
+
+The full tensor array: 1024 abutted tiles, 2.27 mm² of 7 nm silicon,
+and the traveling-clock thesis proven in two dimensions. There is no
+array clock tree — each row's clock enters at the west edge and walks
+the tile chain (+82.35 ps/tile), and the rows themselves are staggered
++85 ps southward by the spine contract `chip_top` will implement
+physically. The per-tile clock table (`flow/report_clock_table.py`)
+shows the capture clock marching monotonically across both axes of the
+routed array, corner to corner: tile (0,0) at +152 ps, tile (31,31) at
++5,340 ps — a 5.2 ns clock wave surfing 1024 macros, with hold positive
+everywhere by construction (per-bit pre-delay contracts + the early
+spine tap) and zero hold-repair buffers in the macro sea.
+
+![32×32 abutted array layout](img/mac_grid_gds.webp)
+
+Signoff @ 250 MHz, TT, routed SPEF: setup **+1156 ps** (TNS 0, ~351 MHz
+capable), hold **+435 ps** (TNS 0), 0 violations of any type except one
+max-slew pin 5.13 ps over the 320 ps limit (the same GR-vs-DRT erosion
+tail recorded on both rows — recorded, not waived). DRC clean across
+all 1,984 abutted tile boundaries.
+
+### The port-buffer trap (8,633 real violations wearing a phantom's face)
+
+The array closed at CTS offline (+1156/+513) — yet the flow reported
+ws −9,345 ps on 54,290 endpoints, and 5_1's `repair_design` spent 2.7 h
+inserting 15,103 rescue buffers before dying in legalization
+(`DPL-0036`: 4,667 unplaceable). The violations were REAL: ORFS runs
+`buffer_ports` during global placement, and its 3,333 port buffers can
+only legalize in the south strip — the only stdcell rows in an abutted
+macro sea. Every pin-adjacent port (B above row 0, west signals beside
+column 0) detoured ~1.5 mm down to its buffer and back: 267 fF nets,
+14.6 ns slews. The fix is architectural, not reparative:
+`DONT_BUFFER_PORTS = 1` — ports ARE the abutment contract, pin-adjacent
+by floorplan — plus `set_driving_cell` on every input in the generated
+SDC (BUFx4 data / BUFx24 clocks), so unbuffered ports are modeled from
+the drivers `chip_top` will place, not as ideal zero-slew sources.
+With the detours gone, post-GR repair found ONE slew violation and the
+full route finished in minutes.
+
+### Reading STA like it matters
+
+Two readout rules, both paid for in lost hours this phase:
+`report_checks` prints one path **per clock group** — this design has
+33 clocks, so a truncated tail shows only the passing far-row groups
+("+1359 MET") while clk_0 sits at −9.3 ns; `report_worst_slack
+-max/-min` first, always. And the flow's per-stage metrics are
+evidence, not noise: the "phantom-looking" −9.3 ns at CTS was the bug,
+and the offline STA that disagreed was the misread.
+
 ## Failure log
 
 Every distinct flow error hit, with root cause + fix, so it's never
@@ -276,3 +326,9 @@ re-debugged from scratch.
 | all 32 drain_out bits fail setup −460 ps | mac_row_abut | far tiles launch on a clock ~2.7 ns east; combinational mux return can't recross 1.5 mm in the early-clock cycle | RTL: registered row drain + array row-select delay + STORE write-back stage (94 tests bit-exact); drain_slot multicycle-2 mirrors its burst-static RTL contract |
 | `make all_leaves` exits 0 with failing tests | rtl/tb | cocotb 1.x's Makefile.sim does not propagate test failures | `rtl/tb/check_results.py` parses results.xml after every sim; the driver fails on any `<failure>` |
 | 2 max-slew pins, worst −2.8 ps | mac_row_abut | same GR-vs-DRT erosion tail as the 7a row, now ≤0.9% over the limit | **recorded, not waived** |
+| CTS hold repair buffer cap (RSZ-0060) again; hold WNS −2670 ps at the drain register, setup repair stuck at −8566 ps on 52.5k endpoints | mac_grid (first attempt, δs=150) | the SDC's southward clock stagger was a guess (150 ps/row); measured in-context the southbound arcs are b_in→b_out 88.9 ps and drain_n_in→drain_s_out only **52.6 ps** (a bare mux, never floored) — far rows' drain led the south-strip capture clock by ~2.7 ns, and no single δs satisfies B (wants ≈89) and drain (wants ≤53) at once | tile **rev C**: `set_min_delay 85` on BOTH vertical feedthroughs (the rev-B wave-matching rule rotated 90°), grid δs = 85. Measure the waves before constraining them — pre-CTS STA on the placed odb gives the per-row arc table in minutes |
+| rev-C floors changed nothing — attempt-2 lib byte-identical, drain chain still 52.6 ps/hop | mac_grid (second attempt) | port-to-port `set_min_delay` has NO clocked endpoint; neither the tile's nor any repair stage inserts delay for it (the rev-B west floors never physically materialized either — the ROW closed because its parent-level hold repair inserted ~1.9 ns of pre-delay buffers on the west port nets, which a macro-to-macro abutted grid has no room for) | per-bit pre-delay **interface contracts** generated from the characterised lib (`gen_constraints.py`): west `(δe−δ_min(bit))·31`, B `(δs−δb_min(bit))·31`, and the drain captured on an **early spine tap** (clk_s ≈ 1.94 ns) so every row is hold-positive with zero repair buffers. Validated offline on the placed DB, propagated clocks: **setup +1139 / hold +78, TNS 0 both** — the SDC iteration loop is minutes (docker STA) instead of an hour per flow run |
+| 5_1 global route OOM (make error 247, ×3) even at 1 congestion iteration | mac_grid | GRT's congestion-resolution loop peaks ~11.6 GB on the 1024-macro array; the WSL2 VM was capped at 7 GB | `.wslconfig` swap=16GB (GRT runs 7.1 GB RAM + 4.5 GB swap and completes in ~7 min); `GLOBAL_ROUTE_ARGS = -congestion_iterations 2 -allow_congestion` in config.mk keeps the loop bounded |
+| `DPL-0036` again — 4,667 of 15,103 post-GR repair buffers unplaceable; ws −9,345 ps / 54,290 endpoints at CTS | mac_grid | **`buffer_ports`** (3_3): its 3,333 port buffers can only legalize in the south strip, so every pin-adjacent port detours ~1.5 mm (267 fF, 14.6 ns slew) — real violations that repair then tried to buffer mid-sea, where there are no rows | `DONT_BUFFER_PORTS = 1` + `set_driving_cell` port-drive contracts in `gen_constraints.py` (BUFx4 data / BUFx24 clocks — no ideal zero-slew ports; `chip_top` places the real drivers in 7d). Post-GR repair drops to 1 slew violation / 1 buffer |
+| offline STA read "+1359 MET" while the flow said ws −9,345 — offline initially trusted, flow dismissed as phantom | mac_grid | `report_checks` prints one path **per clock group** (33 clocks here); a truncated tail shows only the last, passing groups | `report_worst_slack -max/-min` first, untruncated, before any per-path reading; per-stage flow metrics are evidence until explained |
+| `report_clock_table.py` FAIL: 27 "NON-MONOTONIC" diagonal tiles, Δ = 0.00 | mac_grid | checker artifact — monotonicity was tracked per-row only, so diagonal samples in otherwise-unsampled rows had no predecessor and flagged themselves | checker fixed to compare against sampled predecessors on **both axes**; table passes: +82.35 ps/col, +85.00 ps/row, 52 tiles |

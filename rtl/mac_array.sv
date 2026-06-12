@@ -121,6 +121,7 @@ module mac_array #(
         .row_hit_v(row_hit),
         .a_v     (a_bus),
         .b_n_flat(b_bus),
+        .drain_n_flat({N{32'h0}}),
         .clk_s   (clk),
         .drain_col_sel(drain_idx[NW-1:0]),
         .drain_data(drain_data)

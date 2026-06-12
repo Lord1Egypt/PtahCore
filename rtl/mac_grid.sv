@@ -47,6 +47,12 @@ module mac_grid #(
 
     // ── north (row 0's b_in pins; traveling j·δe arrival) ────────────
     input  wire [N*32-1:0]         b_n_flat,
+    // Row 0's drain_n_in, tied LOW by the parent. A port, not an
+    // internal constant: a tie cell could only legalize into the south
+    // strip and its 1024 nets would have to cross the whole tile sea —
+    // as a north-edge port the tie is the parent's (local) problem,
+    // exactly like B delivery.
+    input  wire [N*32-1:0]         drain_n_flat,
 
     // ── south strip ──────────────────────────────────────────────────
     input  wire                    clk_s,
@@ -112,7 +118,7 @@ module mac_grid #(
 
         for (gj = 0; gj < N; gj++) begin : north
             assign v_b[0][gj]  = b_n_flat[gj*32 +: 32];
-            assign v_dr[0][gj] = 32'h0;
+            assign v_dr[0][gj] = drain_n_flat[gj*32 +: 32];
         end
     endgenerate
 
