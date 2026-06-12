@@ -220,6 +220,24 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
       GRT OOM (→16 GB swap), the port-buffer trap (`DONT_BUFFER_PORTS=1`
       + set_driving_cell contracts), the per-clock-group STA readout
       trap — all in docs/HARDENING.md. Full RTL→GDSII ≈ 33 min.
+- [x] **Phase 7d-1: physical SMEM** (2026-06-12) — smem_phys.sv: 2
+      copies × 8 banks of fakeram7_256x256 (1RW) behind smem's exact
+      contract; LOAD beats coalesce to 32-B lines; 1RW collisions stall
+      the MMA fetch (rd_stall retry, bit-exact under 40% random stalls)
+- [x] **Phase 7d-2: chip traveling clock RTL** (2026-06-12) —
+      docs/CHIP_SPEC.md contract; clk_spine.sv west (M+LAG_W taps +
+      clk_s early tap) + north (N+LAG_B) spines; TWO-STAGE launch banks
+      (stage A on clk_s tap, stage B on per-row/col late taps): the
+      pre-delay contracts become launch-clock phases, hold-safe by
+      phase with zero min-delay assumptions; store DRAIN_LAT=4. Grid
+      abstract VERIFIED: setup+hold arcs per data pin vs every row
+      clock (34,021 each), zero falling_edge arcs. 17 RTL units + 37
+      Python green; chip e2e through spine+banks+smem_phys bit-exact
+- [ ] Phase 7d-3: chip flow design — floorplan (L-strip: west logic +
+      SMEM macros + spine, north B strip), BLOCKS = mac_grid +
+      fakeram7_256x256, dont_touch the spine, launch-bank placement
+      regions, PDN; abstracts chained in the harden script (a later
+      `make generate_abstract` re-runs the whole flow)
 - [ ] chip_top GDS — **timing closed honestly, zero masked hold violations**
 - [ ] 2D/3D layout viewer deployed (GDS → web)
 
