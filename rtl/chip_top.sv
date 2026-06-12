@@ -120,13 +120,15 @@ module chip_top #(
         .phase_q(bar_phase)
     );
 
-    // ── SMEM ─────────────────────────────────────────────────────────
-    smem #(.SMEM_BYTES(SMEM_BYTES), .BARRIER_REGION(BARRIER_REGION),
-           .RD_BYTES(RD_BYTES), .WR_BYTES(WR_BYTES)) u_smem (
-        .clk(clk),
+    // ── SMEM (physical: banked 1RW SRAM macros, see smem_phys.sv) ────
+    wire smem_rd_stall;
+    smem_phys #(.SMEM_BYTES(SMEM_BYTES), .BARRIER_REGION(BARRIER_REGION),
+                .RD_BYTES(RD_BYTES), .WR_BYTES(WR_BYTES)) u_smem (
+        .clk(clk), .rst(rst),
         .wr_en(smem_wr_en), .wr_addr(smem_wr_addr), .wr_data(smem_wr_data),
         .rd_a_addr(rd_a_addr), .rd_a_data(rd_a_data),
-        .rd_b_addr(rd_b_addr), .rd_b_data(rd_b_data)
+        .rd_b_addr(rd_b_addr), .rd_b_data(rd_b_data),
+        .rd_stall(smem_rd_stall)
     );
 
     // ── LOAD ─────────────────────────────────────────────────────────
@@ -149,6 +151,7 @@ module chip_top #(
         .busy(mma_busy), .done(mma_done),
         .rd_a_addr(rd_a_addr), .rd_a_data(rd_a_data),
         .rd_b_addr(rd_b_addr), .rd_b_data(rd_b_data),
+        .rd_stall(smem_rd_stall),
         .drain_slot(drain_slot), .drain_idx(drain_idx), .drain_data(drain_data)
     );
 

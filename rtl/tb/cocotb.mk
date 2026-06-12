@@ -37,6 +37,10 @@ ifeq ($(TOP),smem)
   VERILOG_SOURCES = $(RTL)/smem.sv
   MODULE = test_smem_barrier
 endif
+ifeq ($(TOP),smem_phys)
+  VERILOG_SOURCES = $(RTL)/fakeram7_256x256.sv $(RTL)/smem_phys.sv
+  MODULE = test_smem_phys
+endif
 ifeq ($(TOP),barrier)
   VERILOG_SOURCES = $(RTL)/barrier.sv
   MODULE = test_smem_barrier
@@ -75,12 +79,15 @@ endif
 ifeq ($(TOP),mma_unit)
   VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv $(RTL)/mac_grid.sv $(RTL)/mac_array.sv $(RTL)/mma_unit.sv
   MODULE = test_mma_unit
-  COMPILE_ARGS += -GM=4 -GN=4 -GK=8
+  # K=16 → A_BYTES=64 = 2 fetch chunks, so the stall/retry path is
+  # exercised mid-stream, not only on the first issue
+  COMPILE_ARGS += -GM=4 -GN=4 -GK=16
 endif
 ifeq ($(TOP),chip_top)
   VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp8_encode.sv $(RTL)/fp32_mul.sv \
     $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv $(RTL)/mac_grid.sv \
-    $(RTL)/mac_array.sv $(RTL)/mma_unit.sv $(RTL)/smem.sv $(RTL)/barrier.sv \
+    $(RTL)/mac_array.sv $(RTL)/mma_unit.sv $(RTL)/fakeram7_256x256.sv \
+    $(RTL)/smem_phys.sv $(RTL)/barrier.sv \
     $(RTL)/load.sv $(RTL)/store.sv $(RTL)/cmdproc.sv $(RTL)/chip_top.sv
   MODULE = test_chip_top
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
