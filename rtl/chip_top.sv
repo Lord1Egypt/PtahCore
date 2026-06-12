@@ -32,6 +32,11 @@ module chip_top #(
     parameter int IW            = 160
 ) (
     input  wire                clk,
+    // Spine root — a separate clock PORT so the chip flow's CTS owns
+    // clk (the logic tree) while the spine stays a dont_touch buffer
+    // chain (CHIP_SPEC §1). Externally both pins carry the same clock;
+    // in sim the TB drives them with the same waveform.
+    input  wire                clk_spine,
     input  wire                rst,
 
     // host instruction push
@@ -110,8 +115,8 @@ module chip_top #(
 
     wire [M+LAG_W-1:0] wtap;
     wire [N+LAG_B-1:0] ntap;
-    clk_spine #(.TAPS(M + LAG_W)) u_spine_w (.clk_in(clk), .tap(wtap));
-    clk_spine #(.TAPS(N + LAG_B)) u_spine_n (.clk_in(clk), .tap(ntap));
+    clk_spine #(.TAPS(M + LAG_W)) u_spine_w (.clk_in(clk_spine), .tap(wtap));
+    clk_spine #(.TAPS(N + LAG_B)) u_spine_n (.clk_in(clk_spine), .tap(ntap));
     wire clk_s_tap = wtap[CLK_S_TAP];
 
     // ── cmdproc ──────────────────────────────────────────────────────

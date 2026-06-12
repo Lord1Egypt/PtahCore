@@ -205,7 +205,14 @@ module mac_array #(
     end
     assign drain_data = drain_q;
 
+    // At chip P&R the grid is the hardened macro resolved from its
+    // liberty model, which has no parameters — and the chip IS the
+    // default 32×32 shape. Sim and unit hardening keep the overrides.
+`ifdef GRID_MACRO
+    mac_grid u_grid (
+`else
     mac_grid #(.M(M), .N(N), .TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W)) u_grid (
+`endif
         .clk_v   (clk_row_v),
         .rst_v   ({M{rst}}),
         .en_v    (l_en),

@@ -26,7 +26,7 @@
 
 module cmdproc #(
     parameter int NUM_BARRIERS = 16,
-    parameter int FIFO_DEPTH   = 256,
+    parameter int FIFO_DEPTH   = 64,   // config.py CMD_FIFO_DEPTH
     parameter int MAX_BODY     = 32,
     parameter int IW           = 160
 ) (

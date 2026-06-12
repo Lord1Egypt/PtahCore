@@ -32,7 +32,11 @@ BARRIER_REGION = NUM_BARRIERS * BARRIER_BYTES   # reserved SMEM prefix
 LOAD_BYTES_PER_CYCLE = 16       # DMA bandwidth gmem→smem
 
 # ── Command front-end ────────────────────────────────────────────────
-CMD_FIFO_DEPTH = 256            # instructions
+# 64, not autogpu's 256: REPEAT is the answer to deep instruction
+# streams (their documented FIFO-overflow flaw), and 256×160 b of flops
+# blew up chip synthesis (yosys OOM lowering the read mux) for capacity
+# v1 never needs. 64 + REPEAT ≥ 256 without it.
+CMD_FIFO_DEPTH = 64             # instructions
 INSTR_BITS = 64                 # fixed-width encoding
 REPEAT_MAX_LEN = 32             # max body length of a REPEAT block
 REPEAT_MAX_COUNT = 65535        # 16-bit repeat counter

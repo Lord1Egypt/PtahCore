@@ -78,8 +78,20 @@ async def _dram(dut, mem: bytearray):
             mem[wa:wa + nb] = data
 
 
+async def _clocks(dut):
+    """clk and the spine-root port carry the same waveform (one source
+    pin in silicon; two ports so CTS owns only the logic tree)."""
+    while True:
+        dut.clk.value = 0
+        dut.clk_spine.value = 0
+        await Timer(1, "ns")
+        dut.clk.value = 1
+        dut.clk_spine.value = 1
+        await Timer(1, "ns")
+
+
 async def _reset(dut):
-    cocotb.start_soon(Clock(dut.clk, 2, "ns").start())
+    cocotb.start_soon(_clocks(dut))
     dut.rst.value = 1
     dut.push_en.value = 0
     dut.push_instr.value = 0
