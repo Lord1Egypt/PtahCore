@@ -2,8 +2,19 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-12 ~08:00, Phase 7c COMPLETE on branch
-> `feat/phase7c3-grid-harden`, PR pending):**
+> **▶ RESUME HERE (as of 2026-06-12 ~15:00, Phase 7d-3 IN PROGRESS,
+> branch `feat/phase7d3-chip-flow`):** 7c (PR #20), 7d-1+2 (PR #21)
+> MERGED. Chip flow scaffolded: flow/designs/asap7/chip_top/
+> (config/SDC/floorplan-gen/macro_place/io) + flow/harden_chip.sh.
+> Iterating chip SYNTH smoke (log /tmp/chip_synth.log): fixed so far —
+> liberty-vs-paramod (GRID_MACRO define), SYNTH_MEMORY_MAX_BITS, CMD
+> FIFO 256→64 (yosys OOM). Next: synth → floorplan → place → CTS → the
+> SIXTH GDS; honesty tables = spine-tap arrivals (~85 ps/tap) +
+> launch-phase vs grid-lib arcs. Grid macro artifacts must exist at
+> flow/results/asap7/mac_grid/base/ (mac_grid.lef, mac_grid_typ.lib,
+> 6_final.gds) — harden_grid.sh rebuilds them if wiped.
+>
+> *(previous checkpoint, Phase 7c complete:)*
 > Phases 0–7c done — **FIVE GDS out**, and the headline is the
 > **32×32 ABUTTED ARRAY**: 1024 mac_tile macros pin-on-pin, no array
 > CTS, the clock traveling +82.35 ps/col east and +85 ps/row south,
