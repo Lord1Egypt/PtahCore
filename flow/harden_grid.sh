@@ -34,17 +34,28 @@ run_make() {
                   make DESIGN_CONFIG=$1 WORK_HOME=/work/flow ${MAKE_ARGS} $2"
 }
 
-echo "▶ [1/3] mac_tile block + abstract"
+echo "▶ [1/4] mac_tile block + abstract"
 run_make "${BLOCK_CFG}" ""
 run_make "${BLOCK_CFG}" "generate_abstract"
 
-echo "▶ [2/3] patch clk_in→clk_out arc (STA clock propagation)"
+echo "▶ [2/4] patch clk_in→clk_out arc (STA clock propagation)"
 docker run --rm -v "${REPO}:/work" "${IMAGE}" \
     python3 /work/flow/patch_tile_clk_arc.py \
     /work/flow/results/asap7/mac_grid_mac_tile/base/mac_tile_typ.lib
 
-echo "▶ [3/3] 32×32 abutted array"
+echo "▶ [3/4] 32×32 abutted array"
 "${REPO}/flow/harden.sh" mac_grid
+
+echo "▶ [4/4] grid abstract for chip_top (exact M6/M7 OBS — PDN-0006)"
+run_make "/work/flow/designs/asap7/mac_grid/config.mk" "generate_abstract"
+DOCKER_CONFIG="${DOCKER_CONFIG_DIR}" docker run --rm \
+    -v "${REPO}:/work" "${IMAGE}" \
+    bash -lc "source /OpenROAD-flow-scripts/env.sh 2>/dev/null || true
+              cd /work/flow/results/asap7/mac_grid/base &&
+              cp mac_grid.lef mac_grid_bloat.lef.bak &&
+              openroad -no_init -no_splash -exit /work/flow/exact_abstract.tcl &&
+              python3 /work/flow/exact_obs_lef.py mac_grid_exact.lef mac_grid.lef \
+                  --exact-layers M7"
 
 echo "✅ grid done — now: flow/check_abutment.py (2D),"
 echo "   per-tile clock arrivals in flow/reports/asap7/mac_grid/base/6_finish*.rpt"

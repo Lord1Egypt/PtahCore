@@ -31,6 +31,12 @@ export SYNTH_MEMORY_MAX_BITS = 65536
 
 export SDC_FILE = $(PTAHCORE)/flow/designs/asap7/chip_top/constraint.sdc
 
+# Design-local PDN: the grid macro's power pins are its own M6 straps
+# under an exact-OBS M7 (flow/exact_obs_lef.py) — the platform macro
+# grids only know the fakeram M4→M5 contract (PDN-0232). Also powers
+# the dont_touch spine buffers (ODB-0383). See pdn.tcl header.
+export PDN_TCL = $(PTAHCORE)/flow/designs/asap7/chip_top/pdn.tcl
+
 # Hard macros: the array (our fifth GDS) + the platform SRAMs.
 # FakeRAM2.0 is a black-box generator — no GDS internals exist; the
 # merged chip GDS carries the SRAM outlines only (recorded limitation,
