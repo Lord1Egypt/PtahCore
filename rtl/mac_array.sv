@@ -70,18 +70,27 @@ module mac_array #(
 
     // ── select column k ──────────────────────────────────────────────
     // a_lat byte for (i,k) is at element (i*K + k); likewise B (j*K + k).
-    logic [7:0] a_col [M];
-    logic [7:0] b_col [N];
-    // column index, clamped during the flush cycle (k_q == K) so the
-    // operand part-select never runs past the latched tile
-    logic [31:0] kc;
-    assign kc = (k_q < 32'(K)) ? k_q : (32'(K) - 32'd1);
-    always_comb begin
-        for (int i = 0; i < M; i++)
-            a_col[i] = a_lat[(32'(i)*32'(K) + kc)*8 +: 8];
-        for (int j = 0; j < N; j++)
-            b_col[j] = b_lat[(32'(j)*32'(K) + kc)*8 +: 8];
-    end
+    // Two-step select: a CONSTANT K·8-bit window per element, then the
+    // kc mux inside it. Indexing the full M·K·8 latch with the runtime
+    // kc makes yosys emit a full-width barrel shifter PER ELEMENT
+    // (64 × $shiftx_8192 — the 7d-3 chip-synth OOM).
+    wire [7:0] a_col [M];
+    wire [7:0] b_col [N];
+    // column index, clamped during the flush cycles (k_q >= K) so the
+    // operand select never runs past the latched tile
+    localparam int KW = (K > 1) ? $clog2(K) : 1;
+    logic [KW-1:0] kc;
+    assign kc = (k_q < 32'(K)) ? KW'(k_q) : KW'(K - 1);
+    generate
+        for (genvar gk = 0; gk < M; gk++) begin : col_a
+            wire [K*8-1:0] win = a_lat[gk*K*8 +: K*8];
+            assign a_col[gk] = win[kc*8 +: 8];
+        end
+        for (genvar gk = 0; gk < N; gk++) begin : col_b
+            wire [K*8-1:0] win = b_lat[gk*K*8 +: K*8];
+            assign b_col[gk] = win[kc*8 +: 8];
+        end
+    endgenerate
 
     // ── edge decoders: M for A column, N for B column ────────────────
     logic [31:0] a_f32 [M];

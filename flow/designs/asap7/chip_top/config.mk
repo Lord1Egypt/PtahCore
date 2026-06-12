@@ -44,8 +44,8 @@ export ADDITIONAL_GDS  += $(WORK_HOME)/results/asap7/mac_grid/base/6_final.gds
 # Floorplan (gen_floorplan.py — regenerate after geometry changes):
 # grid macro at the south-east, L-strip west (logic + SRAM column +
 # spine) and north (B launch) — CHIP_SPEC §3.
-export DIE_AREA  = 0 0 1674.43 1583.28
-export CORE_AREA = 2.16 2.16 1672.27 1581.12
+export DIE_AREA  = 0 0 1674.432 1583.280
+export CORE_AREA = 2.160 2.160 1672.272 1581.120
 export MACRO_PLACEMENT_TCL = $(PTAHCORE)/flow/designs/asap7/chip_top/macro_place.tcl
 export IO_CONSTRAINTS = $(PTAHCORE)/flow/designs/asap7/chip_top/io_constraints.tcl
 export MACRO_PLACE_HALO = 2 2

@@ -56,14 +56,17 @@ def main():
       f"-location {{{grid_x:.3f} {grid_y:.3f}}} -orientation R0")
     # SRAM column at the far west: copy A banks bottom-up, then copy B.
     # 16 × 84 µm + halos needs ~1.4 mm of the ~1.53 mm core height.
+    # Names are BRACED: the ODB keeps Yosys escapes, so the instance
+    # name literally contains backslashes — unbraced, TCL consumes them
+    # and place_macro finds nothing (MPL-0020; mac_grid pattern).
     ram_x = MARGIN + 4.32
     y = MARGIN + 8.64
     for g in range(8):
-        A(f"place_macro -macro_name u_smem.bank\\[{g}\\].u_copy_a "
+        A(f"place_macro -macro_name {{u_smem.bank\\[{g}\\].u_copy_a}} "
           f"-location {{{ram_x:.3f} {snap(y, QY):.3f}}} -orientation R0")
         y += RAM_H + 2 * HALO + 2.16
     for g in range(8):
-        A(f"place_macro -macro_name u_smem.bank\\[{g}\\].u_copy_b "
+        A(f"place_macro -macro_name {{u_smem.bank\\[{g}\\].u_copy_b}} "
           f"-location {{{ram_x:.3f} {snap(y, QY):.3f}}} -orientation R0")
         y += RAM_H + 2 * HALO + 2.16
     ram_top = y
@@ -85,9 +88,12 @@ def main():
       f"-region left:{MARGIN + 800:.2f}-{MARGIN + 1100:.2f}")
     (HERE / "io_constraints.tcl").write_text("\n".join(io) + "\n")
 
-    print(f"DIE_AREA  = 0 0 {die_w:g} {die_h:g}")
-    print(f"CORE_AREA = {MARGIN:g} {MARGIN:g} {snap(die_w - MARGIN, QX):g} "
-          f"{snap(die_h - MARGIN, QY):g}")
+    # full precision — %g's 6 significant digits truncated 1674.432 to
+    # 1674.43, sliding the core right edge one site short of the grid
+    # macro (MPL-0034)
+    print(f"DIE_AREA  = 0 0 {die_w:.3f} {die_h:.3f}")
+    print(f"CORE_AREA = {MARGIN:.3f} {MARGIN:.3f} "
+          f"{snap(die_w - MARGIN, QX):.3f} {snap(die_h - MARGIN, QY):.3f}")
     print(f"grid macro at ({grid_x:.3f}, {grid_y:.3f}); "
           f"SRAM column top {ram_top:.1f} (core height "
           f"{die_h - 2 * MARGIN:.1f})")

@@ -22,7 +22,15 @@ module clk_spine #(
     output wire [TAPS-1:0]  tap
 );
 
-    // node[0] = clk_in; segment i produces node[i+1] = tap[i]
+    // node[0] = clk_in; segment i produces node[i+1] = tap[i].
+    // UNOPTFLAT waiver: bit b+1 derives from bit b through a buffer
+    // instance, which the simulator sees as a whole-vector
+    // self-dependency and reports as a circular-logic loop. The chain
+    // is pure feed-forward (provably acyclic); iterative settling
+    // converges to the same values. split_var can't break it up:
+    // cocotb's --public-flat-rw makes every signal public, and public
+    // vars are unsplittable.
+    /* verilator lint_off UNOPTFLAT */
     wire [TAPS:0] node;
     assign node[0] = clk_in;
 
@@ -37,6 +45,7 @@ module clk_spine #(
             assign tap[s]    = node[s+1];
         end
     endgenerate
+    /* verilator lint_on UNOPTFLAT */
 
 endmodule
 

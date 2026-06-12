@@ -67,8 +67,12 @@ module mma_unit #(
     localparam int NCHUNK  = (A_BYTES + RD_BYTES - 1) / RD_BYTES;  // A and B same K
 
     // ── operand registers + latched control ──────────────────────────
-    logic [A_BYTES*8-1:0] a_reg;
-    logic [B_BYTES*8-1:0] b_reg;
+    // Assembled from per-chunk enable registers (generate block below) —
+    // a dynamic part-select WRITE into the full M·K·8 vector makes yosys
+    // emit full-width RMW shifter masks ($shift_8192, the other half of
+    // the 7d-3 chip-synth OOM).
+    wire [A_BYTES*8-1:0] a_reg;
+    wire [B_BYTES*8-1:0] b_reg;
     logic [SMEM_AW-1:0]   a_base, b_base;
     logic [SLOT_W-1:0]    slot_q;
     logic                 accum_q, fmt_q;
@@ -85,6 +89,26 @@ module mma_unit #(
     logic [31:0] f;
     logic        pend_v;
     logic [31:0] pend_idx;
+
+    // Per-chunk capture: decoded enables, per-scope regs + assigns
+    // (the launch-bank pattern — no packed-vector multidrive, no RMW
+    // barrel shifters at synth).
+    generate
+        for (genvar gc = 0; gc < NCHUNK; gc++) begin : chunk
+            logic [RD_BYTES*8-1:0] a_q, b_q;
+            always_ff @(posedge clk) begin
+                if (rst) begin
+                    a_q <= '0;
+                    b_q <= '0;
+                end else if (st == FETCH && pend_v && pend_idx == 32'(gc)) begin
+                    a_q <= rd_a_data;
+                    b_q <= rd_b_data;
+                end
+            end
+            assign a_reg[gc*RD_BYTES*8 +: RD_BYTES*8] = a_q;
+            assign b_reg[gc*RD_BYTES*8 +: RD_BYTES*8] = b_q;
+        end
+    endgenerate
 
     // array instance
     logic        arr_start, arr_busy, arr_done;
@@ -109,7 +133,6 @@ module mma_unit #(
         arr_start <= 1'b0;
         if (rst) begin
             st <= IDLE; f <= 0; pend_v <= 1'b0; pend_idx <= 0;
-            a_reg <= '0; b_reg <= '0;
             a_base <= '0; b_base <= '0; slot_q <= '0; accum_q <= 0; fmt_q <= 0;
         end else begin
             case (st)
@@ -121,11 +144,8 @@ module mma_unit #(
                     st     <= FETCH;
                 end
                 FETCH: begin
-                    // capture the in-flight chunk addressed last cycle
-                    if (pend_v) begin
-                        a_reg[pend_idx*RD_BYTES*8 +: RD_BYTES*8] <= rd_a_data;
-                        b_reg[pend_idx*RD_BYTES*8 +: RD_BYTES*8] <= rd_b_data;
-                    end
+                    // the in-flight chunk addressed last cycle lands in
+                    // its per-chunk register (chunk generate, above)
                     if (pend_v && pend_idx == 32'(NCHUNK) - 32'd1) begin
                         pend_v    <= 1'b0;
                         arr_start <= 1'b1;     // all chunks captured
