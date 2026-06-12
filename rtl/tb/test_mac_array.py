@@ -11,7 +11,7 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge
+from cocotb.triggers import FallingEdge, ReadOnly, RisingEdge, Timer
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -43,8 +43,29 @@ def f32(b):
     return struct.unpack("<f", struct.pack("<I", b))[0]
 
 
+async def _clocks(dut):
+    """Drive clk and every spine-tap port in lockstep — in silicon the
+    taps are phase-shifted copies of clk (CHIP_SPEC §1); in sim they
+    are cycle-identical."""
+    ones_m = (1 << M) - 1
+    ones_n = (1 << N) - 1
+    while True:
+        dut.clk.value = 0
+        dut.clk_row_v.value = 0
+        dut.clk_lw_v.value = 0
+        dut.clk_lb_v.value = 0
+        dut.clk_s.value = 0
+        await Timer(1, "ns")
+        dut.clk.value = 1
+        dut.clk_row_v.value = ones_m
+        dut.clk_lw_v.value = ones_m
+        dut.clk_lb_v.value = ones_n
+        dut.clk_s.value = 1
+        await Timer(1, "ns")
+
+
 async def _reset(dut):
-    cocotb.start_soon(Clock(dut.clk, 2, "ns").start())
+    cocotb.start_soon(_clocks(dut))
     dut.rst.value = 1
     dut.start.value = 0
     dut.a_tile.value = 0
@@ -86,7 +107,10 @@ async def _drain_check(dut, slot, ref):
         # registered drain: drive mid-cycle, value valid after the edge
         await FallingEdge(dut.clk)
         dut.drain_idx.value = idx
-        await RisingEdge(dut.clk)
+        # drain pipeline: stage A + stage B launch, grid south register,
+        # capture — data answers this idx four edges later
+        for _ in range(4):
+            await RisingEdge(dut.clk)
         await ReadOnly()
         got = f32(int(dut.drain_data.value))
         await RisingEdge(dut.clk)
