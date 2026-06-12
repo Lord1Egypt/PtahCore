@@ -2410,6 +2410,18 @@ set_multicycle_path 1 -hold  -through [get_pins $chain_pins]
 set_false_path -from [get_ports "rst_v\[*\]"]
 set_false_path -from [get_ports "drain_n_flat\[*\]"]
 
+# Port drive: the grid runs DONT_BUFFER_PORTS=1 -- port buffers
+# cannot legalize in the abutted macro sea (the only stdcell rows
+# are the south strip, so buffer_ports turned every pin-adjacent
+# port into a ~1.5 mm detour: 8633 real setup violations at CTS,
+# then 5_1 repair_design's 15k rescue buffers died DPL-0036).
+# Unbuffered ports default to ideal zero-slew sources, so model
+# the chip_top drivers explicitly: data from the spine's BUFx4,
+# clocks from a CTS-grade BUFx24 (7d implements both physically).
+set_driving_cell -lib_cell BUFx4_ASAP7_75t_R -pin Y [all_inputs]
+set_driving_cell -lib_cell BUFx24_ASAP7_75t_R -pin Y [get_ports "clk_v\[*\]"]
+set_driving_cell -lib_cell BUFx24_ASAP7_75t_R -pin Y [get_ports clk_s]
+
 # Propagate from the start: pre-CTS repair must see the eastward
 # macro clk arcs (ideal-clock analysis drops the j*de capture
 # credit and reports tens of thousands of phantom setup

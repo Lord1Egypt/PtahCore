@@ -2,27 +2,36 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-12 ~02:30, Phase 7c-3, branch
-> `feat/phase7c3-grid-harden`, WSL restarting for a memory bump):**
-> **ARRAY IS TIMING-CLOSED THROUGH CTS** — post-CTS propagated STA:
-> setup **+1143** / hold **+32**, TNS 0 both, zero hold violations at
-> CTS (the per-bit pre-delay contracts + early spine tap from
-> flow/designs/asap7/mac_grid/gen_constraints.py; full failure-archaeology
-> in docs/HARDENING.md). Remaining blocker was 5_1 global route OOM at
-> the old 7 GB WSL cap (Error 247 ×3, even at 1 congestion iteration).
-> All stages ≤ 4_cts are CACHED in flow/results/asap7/mac_grid/base/
-> (do NOT touch config.mk / constraint.sdc / rtl — any mtime change
-> re-runs from synth; one-off overrides go via ORFS_MAKE_ARGS).
-> **To resume after WSL restart** (docker must be running):
+> **▶ RESUME HERE (as of 2026-06-12 ~07:15, Phase 7c-3, branch
+> `feat/phase7c3-grid-harden`):** swap bump WORKED (15.6 GB live; GRT
+> peaked ~11.6 GB and survived) — and then the run died at the END of
+> 5_1: post-GR `repair_design` inserted **15,103 buffers** that cannot
+> legalize in the macro sea (DPL-0036, 4,667 unplaced). Root cause was
+> REAL, not phantom: ORFS `buffer_ports` (3,333 cells at 3_3) can only
+> legalize in the south strip, turning every pin-adjacent port into a
+> ~1.5 mm detour — 8,633 real setup violations (ws −9.3 ns) visible in
+> 4_cts_final.rpt (worst: b_n_flat → input1425, 267 fF / 14.6 ns slew).
+> FIX (this checkpoint): `DONT_BUFFER_PORTS = 1` in config.mk +
+> `set_driving_cell` port-drive contracts in gen_constraints.py
+> (BUFx4 data / BUFx24 clocks — no ideal zero-slew ports; chip_top
+> implements the drivers physically in 7d). mac_grid artifacts wiped;
+> full re-run from synth launched (~3 min to placement on the blackbox
+> sea). **STA-readout trap:** `report_checks` prints one path PER CLOCK
+> GROUP (33 groups) — a truncated tail shows only clk_8/clk_9 and reads
+> "+1359 MET" while clk_0 is −9.3 ns; always use `report_worst_slack`
+> first. **To resume after a crash** (docker must be running):
 > ```
 > cd /home/lordegypt/ptahcore
-> setsid nohup bash -c "DOCKER_CONFIG=/tmp/dockercfg ORFS_MAKE_ARGS=\"NUM_CORES=6 GLOBAL_ROUTE_ARGS='-congestion_iterations 0 -allow_congestion -verbose'\" flow/harden_grid.sh; echo HARDEN_EXIT=\$?" > /tmp/grid_harden.log 2>&1 &
+> setsid nohup bash -c "DOCKER_CONFIG=/tmp/dockercfg ORFS_MAKE_ARGS=\"NUM_CORES=6\" flow/harden_grid.sh; echo HARDEN_EXIT=\$?" > /tmp/grid_harden.log 2>&1 &
 > tail -f /tmp/grid_harden.log
 > ```
-> (With ≥12 GB the override may be unnecessary — config.mk already caps
-> iterations at 2; the override resumes faster and is known-safe.)
-> It resumes at 5_1_grt (~10 min), then 5_2 detailed route (hours),
-> 6_finish. **After success:** check 6_finish.rpt (setup/hold/slew) +
+> (config.mk's GLOBAL_ROUTE_ARGS caps congestion iterations at 2; with
+> the 16 GB swap no runtime override is needed. If 5_1 repair_design
+> still DPL-0036s, the escape hatch is ORFS_MAKE_ARGS
+> SKIP_INCREMENTAL_REPAIR=1 — setup has >1 ns contract margin and hold
+> is positive by construction, but try the real repair first.)
+> Flow: synth→CTS (~25 min), 5_1 GRT (~10 min + repair), 5_2 detailed
+> route (hours), 6_finish. **After success:** check 6_finish.rpt (setup/hold/slew) +
 > 5_route_drc.rpt (empty = clean), then
 > `python3 flow/check_abutment.py --def flow/results/asap7/mac_grid/base/6_final.def
 > --lef flow/results/asap7/mac_grid_mac_tile/base/mac_tile.lef --cols 32

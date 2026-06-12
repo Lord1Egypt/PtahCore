@@ -46,6 +46,15 @@ export PDN_TCL = $(PTAHCORE)/flow/designs/asap7/mac_grid/pdn.tcl
 export GPL_ROUTABILITY_DRIVEN = 0
 export GPL_TIMING_DRIVEN = 0
 
+# NO port buffers: every port is pin-adjacent to its tile by floorplan
+# contract (B above row 0, west signals beside col 0, drain at the
+# strip), but buffer_ports' 3,333 cells can only legalize in the south
+# strip -- a ~1.5 mm detour that produced 8,633 REAL setup violations
+# (ws -9.3 ns) at CTS and 15k unplaceable rescue buffers at 5_1
+# (DPL-0036). The SDC models the chip_top drivers explicitly instead
+# (set_driving_cell in constraint.sdc -- no ideal zero-slew ports).
+export DONT_BUFFER_PORTS = 1
+
 # kepler-formal LEC needs AVX-512 this host lacks; equivalence is
 # covered by the bit-exact cocotb suite.
 export LEC_CHECK = 0
