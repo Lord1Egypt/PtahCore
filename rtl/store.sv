@@ -1,15 +1,16 @@
 // store — ASYNC drain engine, TMEM slot → gmem. Twin: pymodel/store.py.
 //
-// One fp32 element per cycle from the array's drain port. The drain is
-// REGISTERED at the grid's south boundary (traveling-clock return path
-// — see mac_grid.sv), so drain_data answers the drain_idx of the
-// previous cycle: the engine runs a request stage (idx 0..ELEMS-1) and
-// a write-back stage one cycle behind it. At each drain-row change
-// (every N elements, and at burst start) the engine inserts ONE settle
-// bubble so the grid's southbound chain is a settled bus before its
-// first capture (ARRAY_SPEC §3) — M extra cycles per burst. dtype=0
-// writes 4-byte fp32; dtype=1 converts through fp8_encode (RNE,
-// saturating e4m3), 1 byte.
+// One fp32 element per cycle from the array's drain port. The drain
+// return is a REGISTER PIPELINE — the grid's south-boundary register
+// (mac_grid.sv) plus, at chip level, the launch and capture registers
+// of the clk_s tap (CHIP_SPEC §2) — so drain_data answers the
+// drain_idx of DRAIN_LAT cycles ago: the engine runs a request stage
+// (idx 0..ELEMS-1) and a write-back stage DRAIN_LAT behind it.
+// At each drain-row change (every N elements, and at burst start) the
+// engine inserts ONE settle bubble so the grid's southbound chain is a
+// settled bus before its first capture (ARRAY_SPEC §3) — M extra
+// cycles per burst. dtype=0 writes 4-byte fp32; dtype=1 converts
+// through fp8_encode (RNE, saturating e4m3), 1 byte.
 //
 // PtahCore's flagship ISA improvement: completion is a barrier arrival
 // (done pulse), never a front-end stall — epilogue overlap is free.
@@ -20,7 +21,8 @@ module store #(
     parameter int M = 32,
     parameter int N = 32,
     parameter int SLOT_W = 2,
-    parameter int GMEM_AW = 32
+    parameter int GMEM_AW = 32,
+    parameter int DRAIN_LAT = 1     // request → drain_data, cycles
 ) (
     input  wire                clk,
     input  wire                rst,
@@ -56,8 +58,13 @@ module store #(
     logic [$clog2(ELEMS):0] idx_q;              // one extra bit for == ELEMS
     logic               req_active;             // request stage running
     logic               settled_q;              // current drain row has settled
-    logic               wr_v_q;                 // write-back stage valid
-    logic [$clog2(ELEMS):0] wr_idx_q;           // index the data answers
+
+    // request → write-back pipeline: stage [DRAIN_LAT-1] is the index
+    // whose data is on drain_data this cycle
+    logic [DRAIN_LAT-1:0]   v_pipe;
+    logic [$clog2(ELEMS):0] idx_pipe [DRAIN_LAT];
+    wire                    wr_v_q   = v_pipe[DRAIN_LAT-1];
+    wire [$clog2(ELEMS):0]  wr_idx_q = idx_pipe[DRAIN_LAT-1];
 
     // Row-change settle bubble (ARRAY_SPEC §3): when the drain row index
     // changes (every N elements, and at burst start), the grid's
@@ -88,7 +95,8 @@ module store #(
             bar_q <= 4'd0; g_q <= '0; dtype_q <= 1'b0; idx_q <= '0;
             drain_slot <= '0;
             req_active <= 1'b0; settled_q <= 1'b0;
-            wr_v_q <= 1'b0; wr_idx_q <= '0;
+            v_pipe <= '0;
+            for (int s = 0; s < DRAIN_LAT; s++) idx_pipe[s] <= '0;
         end else begin
             if (start) begin
 `ifndef SYNTHESIS
@@ -102,18 +110,20 @@ module store #(
                 idx_q     <= '0;
                 req_active<= 1'b1;
                 settled_q <= 1'b0;
-                wr_v_q    <= 1'b0;
+                v_pipe    <= '0;
             end else if (busy) begin
-                // write-back stage: the registered drain answers last
-                // cycle's request next cycle (settle bubbles are not
-                // requests)
-                wr_v_q   <= req_active && !row_bubble;
-                wr_idx_q <= idx_q;
+                // write-back pipeline: the drain register chain answers
+                // a request DRAIN_LAT cycles later (settle bubbles are
+                // not requests)
+                v_pipe <= DRAIN_LAT'({v_pipe, req_active && !row_bubble});
+                idx_pipe[0] <= idx_q;
+                for (int s = 1; s < DRAIN_LAT; s++)
+                    idx_pipe[s] <= idx_pipe[s-1];
                 if (wr_v_q && wr_idx_q == ($clog2(ELEMS)+1)'(ELEMS - 1)) begin
                     busy     <= 1'b0;
                     done     <= 1'b1;
                     done_bar <= bar_q;
-                    wr_v_q   <= 1'b0;
+                    v_pipe   <= '0;
                 end
                 // request stage
                 if (req_active) begin

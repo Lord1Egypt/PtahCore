@@ -93,6 +93,27 @@ module chip_top #(
     wire [$clog2(M*N)-1:0]   drain_idx;
     wire [31:0]              drain_data;
 
+    // ── the traveling-clock spines (CHIP_SPEC §1) ────────────────────
+    // West spine: M row taps + LAG_W stage-B launch taps; clk_s is the
+    // early tap (≈1.94 ns contract — gen_constraints.py). North spine:
+    // N column taps offset LAG_B for the B launch banks. In simulation
+    // ptah_clkbuf is a wire, so every tap IS clk.
+    localparam int LAG_W     = 17;  // ⌈max west hold contract / δs⌉
+    localparam int LAG_B     = 21;  // ⌈max B hold contract / δe⌉
+    // ⌈1.94 ns / δs⌉ early-tap phase; clamped so small sim shapes
+    // (M=4 ⇒ only M+LAG_W taps) still index a real tap — an
+    // out-of-range part-select reads constant 0 and silently freezes
+    // stage A (found via VCD, the launch banks never clocked)
+    localparam int CLK_S_RAW = 22;
+    localparam int CLK_S_TAP = (CLK_S_RAW < M + LAG_W) ? CLK_S_RAW
+                                                       : M + LAG_W - 1;
+
+    wire [M+LAG_W-1:0] wtap;
+    wire [N+LAG_B-1:0] ntap;
+    clk_spine #(.TAPS(M + LAG_W)) u_spine_w (.clk_in(clk), .tap(wtap));
+    clk_spine #(.TAPS(N + LAG_B)) u_spine_n (.clk_in(clk), .tap(ntap));
+    wire clk_s_tap = wtap[CLK_S_TAP];
+
     // ── cmdproc ──────────────────────────────────────────────────────
     cmdproc #(.NUM_BARRIERS(NUM_BARRIERS), .IW(IW)) u_cmd (
         .clk(clk), .rst(rst),
@@ -146,6 +167,10 @@ module chip_top #(
     mma_unit #(.M(M), .N(N), .K(K), .TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W),
                .SMEM_AW(SMEM_AW), .RD_BYTES(RD_BYTES)) u_mma (
         .clk(clk), .rst(rst),
+        .clk_row_v(wtap[M-1:0]),
+        .clk_lw_v (wtap[M+LAG_W-1:LAG_W]),
+        .clk_lb_v (ntap[N+LAG_B-1:LAG_B]),
+        .clk_s    (clk_s_tap),
         .start(mma_start), .a_smem(mma_a), .b_smem(mma_b),
         .slot(mma_slot), .accum(mma_accum), .fmt(mma_fmt),
         .busy(mma_busy), .done(mma_done),
@@ -156,7 +181,10 @@ module chip_top #(
     );
 
     // ── STORE ────────────────────────────────────────────────────────
-    store #(.M(M), .N(N), .SLOT_W(SLOT_W), .GMEM_AW(GMEM_AW)) u_st (
+    // DRAIN_LAT 4: stage A + stage B launch, grid south register,
+    // chip-side capture (CHIP_SPEC §2).
+    store #(.M(M), .N(N), .SLOT_W(SLOT_W), .GMEM_AW(GMEM_AW),
+            .DRAIN_LAT(4)) u_st (
         .clk(clk), .rst(rst),
         .start(st_start), .start_bar(st_bar), .start_gmem(st_gmem),
         .start_slot(st_slot), .start_dtype(st_dtype),

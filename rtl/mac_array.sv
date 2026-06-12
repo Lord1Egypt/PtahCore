@@ -11,6 +11,21 @@
 // TMEM). STORE drains them one element per cycle through drain_idx →
 // drain_data (row-major; the grid's southbound drain chain + registered
 // south strip — see mac_grid.sv / docs/ARRAY_SPEC.md).
+//
+// LAUNCH BANKS (Phase 7d, CHIP_SPEC §2): every grid input goes through
+// a TWO-STAGE register pipeline whose clocks are spine taps — the
+// pre-delay contracts become launch-clock phases. Stage A (all
+// interface data) is on the clk_s tap (≈ mid-period): capturing root-
+// phase data there is hold-safe by phase alone. Stage B is per row
+// (clk_lw_v[i]) / per column (clk_lb_v[j]) on deliberately LATE taps
+// (row/col phase + the hold-contract lag): capturing stage A's
+// mid-phase data there is again hold-safe by phase — even where the
+// late tap wraps past one period — with NO min-delay assumptions (the
+// 7c-3 lesson: logic min-delay floors are fiction; clock phase is
+// physics). In simulation every tap is the chip clock (ptah_clkbuf is
+// a wire): the banks are two uniform pipeline stages — compute +2
+// cycles (done at k_q == K+2), drain request→data = 4 cycles (store's
+// DRAIN_LAT: stage A, stage B, the grid's south register, capture).
 
 `default_nettype none
 
@@ -23,6 +38,13 @@ module mac_array #(
 ) (
     input  wire                     clk,
     input  wire                     rst,
+
+    // spine taps (sim: all = clk; chip: clk_spine outputs, CHIP_SPEC §1)
+    input  wire [M-1:0]             clk_row_v,  // grid clk_v[i] = tap i
+    input  wire [M-1:0]             clk_lw_v,   // stage-B west launch, row i
+    input  wire [N-1:0]             clk_lb_v,   // stage-B B launch, column j
+    input  wire                     clk_s,      // mid-period tap: stage A,
+                                                // grid south strip, capture
 
     input  wire                     start,
     input  wire [M*K*8-1:0]         a_tile,   // (M,K) fp8 row-major
@@ -111,20 +133,92 @@ module mac_array #(
             a_bus[i*32 +: 32] = a_f32[i];
     end
 
+    // ── launch banks (CHIP_SPEC §2): stage A on the clk_s tap ────────
+    // rst_v stays direct ({M{rst}}): false-pathed, held many cycles,
+    // no wave contract.
+    logic [M-1:0]          sa_en_v, sa_zero_v, sa_hit;
+    logic [M*SLOT_W-1:0]   sa_slot, sa_dslot;
+    logic [M*32-1:0]       sa_a;
+    logic [N*32-1:0]       sa_b;
+    logic [NW-1:0]         sa_col_sel;
+    always_ff @(posedge clk_s) begin
+        sa_en_v    <= {M{cell_en}};
+        sa_zero_v  <= {M{cell_zero}};
+        sa_hit     <= row_hit;
+        sa_slot    <= {M{slot_q}};
+        sa_dslot   <= {M{drain_slot}};
+        sa_a       <= a_bus;
+        sa_b       <= b_bus;
+        sa_col_sel <= drain_idx[NW-1:0];
+    end
+
+    // ── stage B: per-row west taps / per-column north taps ───────────
+    // Per-scope registers + continuous assigns onto the bus slices:
+    // clocked part-select writes from different clocks trip Verilator's
+    // MULTIDRIVEN on the whole packed vector (the launch-bank variant
+    // of the 7c-1 packed-array trap).
+    wire [M-1:0]          l_en, l_zero, l_hit;
+    wire [M*SLOT_W-1:0]   l_slot, l_dslot;
+    wire [M*32-1:0]       l_a;
+    generate
+        for (genvar li = 0; li < M; li++) begin : launch_w
+            logic              en_q, zero_q, hit_q;
+            logic [SLOT_W-1:0] slot_lq, dslot_lq;
+            logic [31:0]       a_q;
+            always_ff @(posedge clk_lw_v[li]) begin
+                en_q     <= sa_en_v[li];
+                zero_q   <= sa_zero_v[li];
+                hit_q    <= sa_hit[li];
+                slot_lq  <= sa_slot[li*SLOT_W +: SLOT_W];
+                dslot_lq <= sa_dslot[li*SLOT_W +: SLOT_W];
+                a_q      <= sa_a[li*32 +: 32];
+            end
+            assign l_en[li]                     = en_q;
+            assign l_zero[li]                   = zero_q;
+            assign l_hit[li]                    = hit_q;
+            assign l_slot[li*SLOT_W +: SLOT_W]  = slot_lq;
+            assign l_dslot[li*SLOT_W +: SLOT_W] = dslot_lq;
+            assign l_a[li*32 +: 32]             = a_q;
+        end
+    endgenerate
+
+    wire [N*32-1:0] l_b;
+    generate
+        for (genvar lj = 0; lj < N; lj++) begin : launch_b
+            logic [31:0] b_q;
+            always_ff @(posedge clk_lb_v[lj])
+                b_q <= sa_b[lj*32 +: 32];
+            assign l_b[lj*32 +: 32] = b_q;
+        end
+    endgenerate
+
+    // Drain column select walks with the same 2-stage depth as
+    // row_hit (coherent settled-bus walk), staying on the clk_s tap;
+    // drain_data is captured on it too: request → A → B → grid south
+    // register → capture = 4 cycles (store's DRAIN_LAT).
+    logic [NW-1:0] l_col_sel;
+    logic [31:0]   drain_q;
+    wire  [31:0]   grid_drain;
+    always_ff @(posedge clk_s) begin
+        l_col_sel <= sa_col_sel;
+        drain_q   <= grid_drain;
+    end
+    assign drain_data = drain_q;
+
     mac_grid #(.M(M), .N(N), .TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W)) u_grid (
-        .clk_v   ({M{clk}}),
+        .clk_v   (clk_row_v),
         .rst_v   ({M{rst}}),
-        .en_v    ({M{cell_en}}),
-        .zero_v  ({M{cell_zero}}),
-        .slot_v  ({M{slot_q}}),
-        .dslot_v ({M{drain_slot}}),
-        .row_hit_v(row_hit),
-        .a_v     (a_bus),
-        .b_n_flat(b_bus),
+        .en_v    (l_en),
+        .zero_v  (l_zero),
+        .slot_v  (l_slot),
+        .dslot_v (l_dslot),
+        .row_hit_v(l_hit),
+        .a_v     (l_a),
+        .b_n_flat(l_b),
         .drain_n_flat({N{32'h0}}),
-        .clk_s   (clk),
-        .drain_col_sel(drain_idx[NW-1:0]),
-        .drain_data(drain_data)
+        .clk_s   (clk_s),
+        .drain_col_sel(l_col_sel),
+        .drain_data(grid_drain)
     );
 
     // ── FSM ──────────────────────────────────────────────────────────
@@ -147,10 +241,14 @@ module mac_array #(
             k_q     <= '0;
         end else if (busy) begin
             k_q <= k_q + 1'b1;
-            // K multiply cycles (0..K-1) + 1 pipeline-flush cycle (K).
-            // The final accumulate latches on the edge leaving k_q==K, so
-            // done pulses then and drain is valid the following cycle.
-            if (k_q == 32'(K)) begin
+            // K multiply cycles (0..K-1) + the two launch stages + one
+            // pipeline-flush cycle: the en wave reaches the cells two
+            // cycles after k_q drives it, so the final accumulate
+            // latches on the edge leaving k_q == K+2. (Physically the
+            // far rows' flush extends a sub-period tail past that edge;
+            // the next MMA issue is ≥2 cycles away by cmdproc
+            // construction — CHIP_SPEC §2.)
+            if (k_q == 32'(K) + 32'd2) begin
                 busy <= 1'b0;
                 done <= 1'b1;
             end

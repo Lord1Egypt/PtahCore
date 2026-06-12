@@ -33,6 +33,12 @@ module mma_unit #(
     input  wire                   clk,
     input  wire                   rst,
 
+    // spine taps, passed through to the array (CHIP_SPEC §1/§2)
+    input  wire [M-1:0]           clk_row_v,
+    input  wire [M-1:0]           clk_lw_v,
+    input  wire [N-1:0]           clk_lb_v,
+    input  wire                   clk_s,
+
     // MMA issue (from cmdproc)
     input  wire                   start,
     input  wire [SMEM_AW-1:0]     a_smem,
@@ -84,6 +90,8 @@ module mma_unit #(
     logic        arr_start, arr_busy, arr_done;
     mac_array #(.M(M), .N(N), .K(K), .TMEM_SLOTS(TMEM_SLOTS), .SLOT_W(SLOT_W)) u_arr (
         .clk(clk), .rst(rst),
+        .clk_row_v(clk_row_v), .clk_lw_v(clk_lw_v),
+        .clk_lb_v(clk_lb_v), .clk_s(clk_s),
         .start(arr_start), .a_tile(a_reg), .b_tile(b_reg),
         .start_slot(slot_q), .start_accum(accum_q), .start_fmt(fmt_q),
         .busy(arr_busy), .done(arr_done),
