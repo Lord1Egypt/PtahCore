@@ -2,22 +2,36 @@
 
 Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 
-> **▶ RESUME HERE (as of 2026-06-12 ~01:00, Phase 7c-3 attempt 3 in
-> ROUTING, branch `feat/phase7c3-grid-harden`):** **THE ARRAY IS
-> TIMING-CLOSED THROUGH CTS** — grid passed 4_1 with ZERO hold
-> violations (no RSZ-0060), post-CTS propagated STA: **setup +1143 /
-> hold +32, TNS 0 both**. The per-bit pre-delay contracts + early
-> spine tap (gen_constraints.py) are the validated mechanism — see
-> HARDENING.md for why tile-internal min_delay floors are a no-op.
-> First 5_1 GRT died Error 247 (OOM at 7 GB WSL2 cap, congestion loop
-> iter 3/30) → `GRT_ALLOW_CONGESTION=1` added, flow RESUMED detached:
-> /tmp/grid_harden4.log (stages ≤4 cached). If GRT/DRT OOMs again, the
-> remaining lever is the Windows-side .wslconfig memory bump (host
-> 16 GB → give WSL ~12 GB + swap; requires wsl --shutdown = kills the
-> session — coordinate with Mohamed). After success: 6_finish.rpt,
-> 5_route_drc.rpt, check_abutment --rows 32 --x0 2.16 --y0 12.96,
-> report_clock_table --rows 32 (~85/row + ~82.34/col), HARDENING.md
-> results, docs/img renders, PR.
+> **▶ RESUME HERE (as of 2026-06-12 ~02:30, Phase 7c-3, branch
+> `feat/phase7c3-grid-harden`, WSL restarting for a memory bump):**
+> **ARRAY IS TIMING-CLOSED THROUGH CTS** — post-CTS propagated STA:
+> setup **+1143** / hold **+32**, TNS 0 both, zero hold violations at
+> CTS (the per-bit pre-delay contracts + early spine tap from
+> flow/designs/asap7/mac_grid/gen_constraints.py; full failure-archaeology
+> in docs/HARDENING.md). Remaining blocker was 5_1 global route OOM at
+> the old 7 GB WSL cap (Error 247 ×3, even at 1 congestion iteration).
+> All stages ≤ 4_cts are CACHED in flow/results/asap7/mac_grid/base/
+> (do NOT touch config.mk / constraint.sdc / rtl — any mtime change
+> re-runs from synth; one-off overrides go via ORFS_MAKE_ARGS).
+> **To resume after WSL restart** (docker must be running):
+> ```
+> cd /home/lordegypt/ptahcore
+> setsid nohup bash -c "DOCKER_CONFIG=/tmp/dockercfg ORFS_MAKE_ARGS=\"NUM_CORES=6 GLOBAL_ROUTE_ARGS='-congestion_iterations 0 -allow_congestion -verbose'\" flow/harden_grid.sh; echo HARDEN_EXIT=\$?" > /tmp/grid_harden.log 2>&1 &
+> tail -f /tmp/grid_harden.log
+> ```
+> (With ≥12 GB the override may be unnecessary — config.mk already caps
+> iterations at 2; the override resumes faster and is known-safe.)
+> It resumes at 5_1_grt (~10 min), then 5_2 detailed route (hours),
+> 6_finish. **After success:** check 6_finish.rpt (setup/hold/slew) +
+> 5_route_drc.rpt (empty = clean), then
+> `python3 flow/check_abutment.py --def flow/results/asap7/mac_grid/base/6_final.def
+> --lef flow/results/asap7/mac_grid_mac_tile/base/mac_tile.lef --cols 32
+> --rows 32 --x0 2.16 --y0 12.96` and
+> `python3 flow/report_clock_table.py --design mac_grid --cols 32 --rows 32`
+> (arrivals must grow ~85 ps/row + ~82.34 ps/col, monotonic, none
+> missing). Then: HARDENING.md results section + failure-log rows for
+> the GRT OOM saga, STEPS tick, docs/img renders (`make gui_final` via
+> WSLg; headless save_image doesn't work), PR.
 > Re-verify RTL: `cd rtl/tb && make all_leaves`; `pytest golden pymodel -q`.
 >
 > *(previous checkpoint, after Phase 7b-3):*
