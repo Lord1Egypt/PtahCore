@@ -118,20 +118,39 @@ module chip_top #(
     clk_spine #(.TAPS(M + LAG_W)) u_spine_w (.clk_in(clk_spine), .tap(wtap));
     clk_spine #(.TAPS(N + LAG_B)) u_spine_n (.clk_in(clk_spine), .tap(ntap));
 
-    // Stage-A launch clock. Unlike the per-row/col wtap/ntap taps (each
-    // a deliberate traveling-clock phase delivered to one grid row/col
-    // plus that row's ~40 launch registers, kept un-buffered so the
-    // +δ/tap stagger survives), clk_s is ONE mid-period phase broadcast
-    // to all 806 stage-A registers chip-wide — an ordinary high-fanout
-    // clock that needs a real CTS distribution tree. It must be DRIVEN
-    // BY ITS OWN BUFFER, not a bare spine tap: post-flatten a bare tap
-    // net IS the dont_touch spine net, so CTS cannot insert a tree below
-    // it without touching the protected backbone (ODB-0373, HARDENING).
+    // Stage-A launch clock. clk_s is ONE mid-period phase broadcast to
+    // all stage-A registers chip-wide — an ordinary high-fanout clock
+    // that needs a real CTS distribution tree. It must be DRIVEN BY ITS
+    // OWN BUFFER, not a bare spine tap: post-flatten a bare tap net IS
+    // the dont_touch spine net, so CTS cannot insert a tree below it
+    // without touching the protected backbone (ODB-0373, HARDENING).
     // u_clk_s_drv isolates a fresh net (clk_s_tap) that CTS is free to
     // tree. In sim ptah_clkbuf is a wire, so behaviour is unchanged.
     wire clk_s_root = wtap[CLK_S_TAP];
     wire clk_s_tap;
     ptah_clkbuf u_clk_s_drv (.A(clk_s_root), .Y(clk_s_tap));
+
+    // Per-tap STAGE-B launch-clock drivers. Each stage-B launch group
+    // (one grid row's west bus / one column's B bus) is clocked by a
+    // deliberately late spine tap. A BARE tap driving the group's ~32
+    // registers is (a) the dont_touch spine net — un-ownable — and (b)
+    // a high-fanout un-treed net whose estimate_parasitics RC is the
+    // −98 ns hold PHANTOM that drowned post-CTS repair (HARDENING). One
+    // driver per tap isolates a fresh, ownable net (clk_lw_buf[i] /
+    // clk_lb_buf[j]) that gen_constraints.py models as a NON-propagated
+    // generated clock carrying the designed stagger (δs·i / δe·j) — so
+    // STA uses the contract phase, not the phantom RC. Un-treed: the
+    // stagger is preserved. Wires in sim → bit-exact.
+    wire [M-1:0] clk_lw_buf;
+    wire [N-1:0] clk_lb_buf;
+    generate
+        for (genvar gtw = 0; gtw < M; gtw++) begin : lw_drv
+            ptah_clkbuf u (.A(wtap[LAG_W + gtw]), .Y(clk_lw_buf[gtw]));
+        end
+        for (genvar gtb = 0; gtb < N; gtb++) begin : lb_drv
+            ptah_clkbuf u (.A(ntap[LAG_B + gtb]), .Y(clk_lb_buf[gtb]));
+        end
+    endgenerate
 
     // ── cmdproc ──────────────────────────────────────────────────────
     cmdproc #(.NUM_BARRIERS(NUM_BARRIERS), .IW(IW)) u_cmd (
@@ -187,8 +206,8 @@ module chip_top #(
                .SMEM_AW(SMEM_AW), .RD_BYTES(RD_BYTES)) u_mma (
         .clk(clk), .rst(rst),
         .clk_row_v(wtap[M-1:0]),
-        .clk_lw_v (wtap[M+LAG_W-1:LAG_W]),
-        .clk_lb_v (ntap[N+LAG_B-1:LAG_B]),
+        .clk_lw_v (clk_lw_buf),
+        .clk_lb_v (clk_lb_buf),
         .clk_s    (clk_s_tap),
         .start(mma_start), .a_smem(mma_a), .b_smem(mma_b),
         .slot(mma_slot), .accum(mma_accum), .fmt(mma_fmt),
