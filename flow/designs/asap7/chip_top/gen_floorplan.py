@@ -34,8 +34,15 @@ GRID_W, GRID_H = 1497.312, 1535.76
 RAM_W, RAM_H = 33.25, 84.0
 
 MARGIN = 2.16          # core-to-die (PDN-0351)
-W_STRIP = 172.8        # west strip width (SRAM col + logic + launch)
-N_STRIP = 43.2         # north strip height (B launch + north spine)
+W_STRIP = 220.32       # west strip width (SRAM col + logic + launch).
+                       # Widened from 172.8: at ~33% strip utilization
+                       # repair buffers had nowhere to legalize, so 1
+                       # stranded inside the grid and DPL's diamond
+                       # search degenerated for any displacement >150 um
+                       # (HARDENING). More room → cells place at small
+                       # displacement, no degeneration.
+N_STRIP = 64.8         # north strip height (B launch + north spine).
+                       # Widened from 43.2 for the launch_b banks.
 HALO = 2.0             # MACRO_PLACE_HALO around every macro
 
 

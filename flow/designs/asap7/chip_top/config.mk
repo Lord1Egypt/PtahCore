@@ -50,8 +50,8 @@ export ADDITIONAL_GDS  += $(WORK_HOME)/results/asap7/mac_grid/base/6_final.gds
 # Floorplan (gen_floorplan.py — regenerate after geometry changes):
 # grid macro at the south-east, L-strip west (logic + SRAM column +
 # spine) and north (B launch) — CHIP_SPEC §3.
-export DIE_AREA  = 0 0 1674.432 1583.280
-export CORE_AREA = 2.160 2.160 1672.272 1581.120
+export DIE_AREA  = 0 0 1721.952 1604.880
+export CORE_AREA = 2.160 2.160 1719.792 1602.720
 export MACRO_PLACEMENT_TCL = $(PTAHCORE)/flow/designs/asap7/chip_top/macro_place.tcl
 export IO_CONSTRAINTS = $(PTAHCORE)/flow/designs/asap7/chip_top/io_constraints.tcl
 export MACRO_PLACE_HALO = 2 2
@@ -69,7 +69,7 @@ export GPL_ROUTABILITY_DRIVEN = 0
 # column where they cannot legalize at the default radius; 50 um lets
 # them hop to the escape rows just east. (500 um made the diamond
 # search degenerate — hours, no progress.)
-export DETAIL_PLACEMENT_ARGS = -max_displacement 50
+export DETAIL_PLACEMENT_ARGS = -max_displacement 150
 
 # CTS builds trees on BOTH the logic clock and clk_s_tap (the stage-A
 # launch clock, 806 sinks chip-wide — without a tree its estimated RC
