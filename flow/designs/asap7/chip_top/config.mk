@@ -71,6 +71,16 @@ export GPL_ROUTABILITY_DRIVEN = 0
 # search degenerate — hours, no progress.)
 export DETAIL_PLACEMENT_ARGS = -max_displacement 50
 
+# CTS builds trees on BOTH the logic clock and clk_s_tap (the stage-A
+# launch clock, 806 sinks chip-wide — without a tree its estimated RC
+# is a -152 ns phantom that drowns post-CTS repair). u_clk_s_drv
+# (chip_top.sv) isolates clk_s_tap from the dont_touch spine so CTS may
+# tree it. -repair_clock_nets is DROPPED from the default args: it tried
+# to rebuffer the clk_spine root and hit the dont_touch backbone
+# (RSZ-3006). The per-row/col wtap/ntap taps are deliberately NOT listed
+# — they are the traveling-clock phases and must stay un-treed.
+export CTS_ARGS = -sink_clustering_enable -clk_nets {clk clk_s_tap}
+
 # House style (see mac_grid/config.mk for each lesson).
 export LEC_CHECK = 0
 export HOLD_SLACK_MARGIN = 15

@@ -14,10 +14,15 @@ create_clock -name clk_spine -period $clk_period [get_ports clk_spine]
 set_clock_uncertainty 100 [get_clocks clk]
 set_clock_uncertainty 100 [get_clocks clk_spine]
 
-# The spine is deliberate physical structure: CTS must not balance it,
-# the resizer must not size or buffer it (CHIP_SPEC §1).
-set_dont_touch [get_cells -hierarchical -filter "ref_name == BUFx24_ASAP7_75t_R"]
-set_dont_touch [get_nets -hierarchical -filter "name =~ *u_spine_*"]
+# The spine BACKBONE is deliberate physical structure: CTS must not
+# balance it, the resizer must not size or buffer it (CHIP_SPEC §1).
+# Match by INSTANCE PATH (*u_spine_*), NOT by ref_name == BUFx24 — the
+# broad ref_name filter also froze u_clk_s_drv (the stage-A launch
+# buffer) and any CTS distribution buffers, leaving the 806-fanout
+# clk_s net un-treeable (ODB-0373, docs/HARDENING.md). Only the
+# u_spine_w / u_spine_n chains are sacred; clk_s gets a normal tree.
+set_dont_touch [get_cells -hierarchical -filter "name =~ *u_spine_*"]
+set_dont_touch [get_nets  -hierarchical -filter "name =~ *u_spine_*"]
 
 # Host/GMEM interface: behavioral-controller contract (CHIP_SPEC §6),
 # generous sub-cycle budgets at the pins. Data ports listed explicitly

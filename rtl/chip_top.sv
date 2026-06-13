@@ -117,7 +117,21 @@ module chip_top #(
     wire [N+LAG_B-1:0] ntap;
     clk_spine #(.TAPS(M + LAG_W)) u_spine_w (.clk_in(clk_spine), .tap(wtap));
     clk_spine #(.TAPS(N + LAG_B)) u_spine_n (.clk_in(clk_spine), .tap(ntap));
-    wire clk_s_tap = wtap[CLK_S_TAP];
+
+    // Stage-A launch clock. Unlike the per-row/col wtap/ntap taps (each
+    // a deliberate traveling-clock phase delivered to one grid row/col
+    // plus that row's ~40 launch registers, kept un-buffered so the
+    // +δ/tap stagger survives), clk_s is ONE mid-period phase broadcast
+    // to all 806 stage-A registers chip-wide — an ordinary high-fanout
+    // clock that needs a real CTS distribution tree. It must be DRIVEN
+    // BY ITS OWN BUFFER, not a bare spine tap: post-flatten a bare tap
+    // net IS the dont_touch spine net, so CTS cannot insert a tree below
+    // it without touching the protected backbone (ODB-0373, HARDENING).
+    // u_clk_s_drv isolates a fresh net (clk_s_tap) that CTS is free to
+    // tree. In sim ptah_clkbuf is a wire, so behaviour is unchanged.
+    wire clk_s_root = wtap[CLK_S_TAP];
+    wire clk_s_tap;
+    ptah_clkbuf u_clk_s_drv (.A(clk_s_root), .Y(clk_s_tap));
 
     // ── cmdproc ──────────────────────────────────────────────────────
     cmdproc #(.NUM_BARRIERS(NUM_BARRIERS), .IW(IW)) u_cmd (

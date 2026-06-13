@@ -11,46 +11,43 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 > abstract; PDN-0232/0233 design-local pdn.tcl; GPL runaway → timing/
 > routability driven OFF; DPL-0036 → -max_displacement 50).
 >
-> **▶ THE CURRENT BLOCKER — CTS (4_1), root-caused, NOT yet fixed:**
-> CTS dies three ways, all the same disease. The chip has TWO clock
-> ports: `clk` (logic, 48,062 sinks — CTS trees it fine) and
-> `clk_spine` (the deliberate dont_touch traveling-clock backbone).
-> The spine TAPS feed high-fanout UNBUFFERED distribution nets — the
-> worst is **`clk_s_tap` = 806 sinks on one net** (every stage-A launch
-> register, chip-wide). Nothing buffers it: I scoped CTS `-clk_nets clk`
-> (excludes the taps), and unscoped CTS instead tries to modify the
-> dont_touch spine buffers (ODB-0370) or repair_timing rebuffers the
-> clk_spine root (RSZ-3006), or hold repair chases the phantom and hits
-> the buffer cap (RSZ-0060, 71,935 buffers, 51,790 "hold viol").
-> **Those −149 ns setup / −152 ns hold numbers in 4_1_cts.log are a
-> PHANTOM** — offline STA on 3_place.odb (propagated clocks) shows the
-> REAL slack is **setup −1255 ps / hold −1329 ps** (sane, the worst is
-> an in-SMEM pend_lo→bank hold path, ordinary hold-buffer territory).
-> The −152 ns is purely the 806-fanout unbuffered `clk_s_tap` RC under
-> estimate_parasitics. Fast-STA recipe lives at /tmp/sta_hold.tcl +
-> /tmp/sta_spine.tcl (read 4 LEFs + 3_place.odb + NLDM TT + fakeram +
-> patched grid lib + 3_place.sdc + estimate_parasitics + propagated).
+ **▶ CTS BLOCKER — root-caused AND FIX APPLIED, re-harden running
+> (commit pending):** CTS died because **`clk_s_tap`, the stage-A launch
+> clock, fans out to 806 registers chip-wide on ONE unbuffered net**.
+> The −149/−152 ns slack in 4_1_cts.log was a PHANTOM (that net's RC
+> under estimate_parasitics); offline STA on 3_place.odb (propagated)
+> shows REAL slack **setup −1255 / hold −1329 ps** — ordinary. CTS could
+> not tree clk_s_tap because post-flatten a bare spine tap net IS the
+> dont_touch spine net (`u_spine_w.seg[22].n[1]` → ODB-0370 unscoped /
+> ODB-0373 when treed / RSZ-3006 from −repair_clock_nets / RSZ-0060 hold
+> repair chasing the phantom).
+> **THE FIX (applied this session):**
+>   1. `rtl/chip_top.sv` — `u_clk_s_drv` (ptah_clkbuf) isolates a fresh
+>      `clk_s_tap` net from the spine so CTS can tree below it (wire in
+>      sim → bit-exact, 3/3 chip TB green). Per-row/col wtap/ntap taps
+>      LEFT un-buffered on purpose — they are the traveling-clock phases.
+>   2. `constraint.sdc` — dont_touch cells matched by `name =~ *u_spine_*`
+>      (NOT `ref_name == BUFx24`, which also froze u_clk_s_drv + CTS's
+>      own buffers). Only the backbone chains stay sacred.
+>   3. `chip_top/config.mk` — `CTS_ARGS = -sink_clustering_enable
+>      -clk_nets {clk clk_s_tap}` (drops −repair_clock_nets, the RSZ-3006
+>      cause); also persisted GPL off + `DETAIL_PLACEMENT_ARGS
+>      = -max_displacement 50` from the earlier place battles.
+> RTL changed ⇒ FULL re-harden from synth (log /tmp/chip_flow.log,
+> `DOCKER_CONFIG=/tmp/dockercfg ORFS_MAKE_ARGS="NUM_CORES=6"
+> flow/harden_chip.sh`). **If CTS still phantoms on the per-row/col taps,
+> buffer those too (same u_clk_s_drv pattern) — but they're localized
+> ~41-fanout so likely fine.** Fast-STA recipe: /tmp/sta_hold.tcl +
+> /tmp/sta_spine.tcl (4 LEFs + odb + NLDM TT + fakeram + patched grid
+> lib + sdc + estimate_parasitics + set_propagated_clock).
+> **Once CTS passes:** route → 6_final GDS (the SIXTH), then the honesty
+> tables (spine-tap arrivals ~85 ps/tap; per-pin launch-phase vs grid
+> lib arcs), check_abutment, render, PR. check_power_grid is
+> recorded-not-verified (won't fit 7.7 GB VM — needs ≥16 GB).
 >
-> **THE FIX (next session, design decision — do NOT hack at 2am):** the
-> spine tap distribution nets (clk_s_tap, the per-row clk_lw_v / per-col
-> clk_lb_v taps) need CTS leaf-distribution trees while the spine
-> BACKBONE buffers (ptah_clkbuf/BUFx24, the u_spine_* chain) stay fixed.
-> They are NOT dont_touch today (only `*u_spine_*` nets + BUFx24 cells
-> are) — so the lever is letting CTS build ONLY the leaf clusters on the
-> taps and forbidding post-CTS repair from touching the backbone.
-> Candidate approaches: (a) `clock_tree_synthesis` with the tap nets as
-> additional clk roots + `SKIP_CTS_REPAIR_TIMING`-style guard so the
-> ODB-0370/RSZ-3006 backbone edits never run; (b) RTL distribution
-> buffers in clk_spine.sv after each tap (hand-balanced, risky at 806
-> fanout); (c) the chip-level clock-architecture rethink CHIP_SPEC §1
-> flagged — co-deliver clk + spine from one root. Pick (a) first.
-> Cached stages ≤ 3_5_place_dp are in flow/results/asap7/chip_top/base/;
-> CTS re-runs from there (command-line CTS_ARGS make-vars don't
-> invalidate the place cache).
->
-> *(superseded earlier 7d-3 synth-smoke checkpoint removed — synth is
-> solved; grid macro artifacts must still exist at
-> flow/results/asap7/mac_grid/base/, harden_grid.sh rebuilds them.)*
+> *(synth-smoke checkpoint removed — synth solved; grid macro artifacts
+> must exist at flow/results/asap7/mac_grid/base/, harden_grid.sh
+> rebuilds them.)*
 >
 > *(previous checkpoint, Phase 7c complete:)*
 > Phases 0–7c done — **FIVE GDS out**, and the headline is the
