@@ -21,26 +21,39 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 > in config.mk (would bust the cache) — fold it in only on the final
 > clean run.**
 >
-> **▶ THE STAGE-B LAUNCH-CLOCK FORK (next real design step):** post-CTS
-> hold repair dies (RSZ-0060) on `launch_b[*].b_q[*]` / `launch_w[*]`
-> — the stage-B launch banks clocked by the un-buffered `wtap`/`ntap`
-> spine taps, −98 ns RC PHANTOM (real slack is ~1.3 ns; the number is
-> estimate_parasitics on high-fanout un-treed clock nets). CANNOT tree
-> them like clk_s: `wtap` is SHARED between `clk_row_v` (grid macro row
-> clocks — must keep the +82 ps/row stagger) and `clk_lw_v` (launch);
-> and stage B feeds the grid's `b_n_flat` captured by the grid's
-> internal staggered column clock, so zero-skew CTS would break the
-> grid lib's setup/hold arcs (unfixable macro). **THE FIX (honest):
-> keep taps un-treed (stagger preserved), make their fanout LOCAL via
-> PLACEMENT — cluster each launch_b[j]/launch_w[i] register group at
-> its grid column/row edge (DEF regions / group_cells), so a 32-fanout
-> tap net is short + low-RC + phantom-free. Likely also separate the
-> grid-delivery taps from the launch taps in RTL (chip_top.sv) so each
-> is handled independently.** This is a full re-harden cycle (RTL +
-> floorplan regions). Alternative quick probe first: tree ONLY `ntap`
-> (launch_b is NOT shared with the grid) via CTS_ARGS to confirm the
-> mechanism, but it will likely trip the grid B-arc check — diagnostic
-> only. Fast-STA: /tmp/sta_hold.tcl + /tmp/sta_spine.tcl.
+> **▶ THE STAGE-B LAUNCH-CLOCK FORK (chosen path: SDC latency model):**
+> post-CTS hold repair dies (RSZ-0060) on `launch_b[*].b_q[*]` /
+> `launch_w[*]` — stage-B launch banks on the un-buffered `wtap`/`ntap`
+> spine taps, −98 ns RC PHANTOM. VALIDATED real slack is fine: offline
+> STA on 3_place (propagated) = hold −1285 ps, the −98 ns appears only
+> post-CTS when clk_s is treed (small delay) and the stagger taps keep
+> their huge estimate_parasitics RC. CANNOT tree the taps: `wtap` is
+> SHARED (clk_row_v grid row clocks need the +82 ps/row stagger;
+> clk_lw_v launch), and stage B feeds the grid's `b_n_flat` captured by
+> the grid's internal staggered column clock → zero-skew CTS breaks the
+> grid lib arcs.
+> **WHAT I LEARNED probing the SDC fix (2026-06-13):** (1) standalone
+> `clock_tree_synthesis` SEGFAULTs offline — needs ORFS's CTS_BUF_LIST
+> env (inferClockBufferList); can't reproduce post-CTS offline that
+> way. (2) **A plain `set_clock_latency` on a pin under a PROPAGATED
+> clock does NOT reliably override the propagated network RC** — that's
+> why the grid used INPUT-PORT clocks with `set_clock_latency -source`.
+> So the chip fix is NOT pin latency; it is: define the stagger taps as
+> **generated clocks** (`create_generated_clock -source clk_spine` at
+> each launch/grid tap) with modeled `-source` latency (δs·i / δe·j from
+> ARRAY_SPEC), and do NOT propagate THEM (propagate only `clk` + the
+> treed `clk_s_tap`). This is the chip analog of mac_grid's
+> gen_constraints.py — BUILD `flow/designs/asap7/chip_top/
+> gen_constraints.py` to emit them. clk_s STAYS treed (806-fanout needs
+> real distribution); only the low-fanout stagger taps get modeled.
+> **NEXT CONCRETE STEP:** write that generator → it emits a constraint
+> block (generated clocks + source latencies + NOT-propagated) appended
+> to constraint.sdc; then full re-harden (SDC change busts cache →
+> from synth ~50 min + 1.9 h repair; budget a long run). If generated
+> clocks still fight CTS/the grid arcs, fall back to placement
+> clustering (cluster each launch group at its grid edge via DEF
+> regions). Fast-STA: /tmp/sta_hold.tcl + /tmp/sta_spine.tcl;
+> /tmp/validate_lat.tcl is the (CTS-segfaulting) repro attempt.
 >
 > *(history: the clk_s blocker —)* CTS died because **`clk_s_tap`, the
 > stage-A launch clock, fans out to 806 registers chip-wide on ONE
