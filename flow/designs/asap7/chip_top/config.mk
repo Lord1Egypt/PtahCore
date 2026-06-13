@@ -57,6 +57,20 @@ export IO_CONSTRAINTS = $(PTAHCORE)/flow/designs/asap7/chip_top/io_constraints.t
 export MACRO_PLACE_HALO = 2 2
 export PLACE_DENSITY = 0.40
 
+# GPL's timing-driven resizer interleave stalled 45+ min at one
+# iteration chasing estimated-parasitic repairs through the grid
+# macro's 34k-arc lib (9+ GB swap, killed). Same disposition as the
+# grid: placement is geometric here; real repair runs at 3_4/CTS/
+# post-route against the pre-delay launch-phase contracts.
+export GPL_TIMING_DRIVEN = 0
+export GPL_ROUTABILITY_DRIVEN = 0
+
+# A handful of repair buffers land in the 4 um sliver west of the SRAM
+# column where they cannot legalize at the default radius; 50 um lets
+# them hop to the escape rows just east. (500 um made the diamond
+# search degenerate — hours, no progress.)
+export DETAIL_PLACEMENT_ARGS = -max_displacement 50
+
 # House style (see mac_grid/config.mk for each lesson).
 export LEC_CHECK = 0
 export HOLD_SLACK_MARGIN = 15
