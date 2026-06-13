@@ -11,9 +11,40 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 > abstract; PDN-0232/0233 design-local pdn.tcl; GPL runaway → timing/
 > routability driven OFF; DPL-0036 → -max_displacement 50).
 >
- **▶ CTS BLOCKER — root-caused AND FIX APPLIED, re-harden running
-> (commit pending):** CTS died because **`clk_s_tap`, the stage-A launch
-> clock, fans out to 806 registers chip-wide on ONE unbuffered net**.
+ **▶ STATUS 2026-06-13 ~17:10: flow runs clean SYNTH→FLOORPLAN→PDN→
+> PLACE→DETAIL-PLACE (DPL needs `-max_displacement 150` now, pass it as
+> a COMMAND-LINE ORFS_MAKE_ARGS override — editing config.mk re-runs
+> from synth; the 1.9 h repair stage 3_4 is cached). CTS half-solved:
+> the clk_s tap-driver fix WORKS (CTS trees clk_s_tap → 13-buf H-tree,
+> no ODB-037x). REMAINING BLOCKER = the stage-B launch-clock fork
+> below. Latest pushed commit d43104f; the 150 displacement is NOT yet
+> in config.mk (would bust the cache) — fold it in only on the final
+> clean run.**
+>
+> **▶ THE STAGE-B LAUNCH-CLOCK FORK (next real design step):** post-CTS
+> hold repair dies (RSZ-0060) on `launch_b[*].b_q[*]` / `launch_w[*]`
+> — the stage-B launch banks clocked by the un-buffered `wtap`/`ntap`
+> spine taps, −98 ns RC PHANTOM (real slack is ~1.3 ns; the number is
+> estimate_parasitics on high-fanout un-treed clock nets). CANNOT tree
+> them like clk_s: `wtap` is SHARED between `clk_row_v` (grid macro row
+> clocks — must keep the +82 ps/row stagger) and `clk_lw_v` (launch);
+> and stage B feeds the grid's `b_n_flat` captured by the grid's
+> internal staggered column clock, so zero-skew CTS would break the
+> grid lib's setup/hold arcs (unfixable macro). **THE FIX (honest):
+> keep taps un-treed (stagger preserved), make their fanout LOCAL via
+> PLACEMENT — cluster each launch_b[j]/launch_w[i] register group at
+> its grid column/row edge (DEF regions / group_cells), so a 32-fanout
+> tap net is short + low-RC + phantom-free. Likely also separate the
+> grid-delivery taps from the launch taps in RTL (chip_top.sv) so each
+> is handled independently.** This is a full re-harden cycle (RTL +
+> floorplan regions). Alternative quick probe first: tree ONLY `ntap`
+> (launch_b is NOT shared with the grid) via CTS_ARGS to confirm the
+> mechanism, but it will likely trip the grid B-arc check — diagnostic
+> only. Fast-STA: /tmp/sta_hold.tcl + /tmp/sta_spine.tcl.
+>
+> *(history: the clk_s blocker —)* CTS died because **`clk_s_tap`, the
+> stage-A launch clock, fans out to 806 registers chip-wide on ONE
+> unbuffered net**.
 > The −149/−152 ns slack in 4_1_cts.log was a PHANTOM (that net's RC
 > under estimate_parasitics); offline STA on 3_place.odb (propagated)
 > shows REAL slack **setup −1255 / hold −1329 ps** — ordinary. CTS could
