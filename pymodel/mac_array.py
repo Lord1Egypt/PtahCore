@@ -31,6 +31,7 @@ import numpy as np
 
 import config
 from golden.fp8 import decode_array
+from golden.mxfp8 import E8M0_BIAS, scale_value
 
 
 class MacArray:
@@ -43,9 +44,21 @@ class MacArray:
         self._b = None      # (N, K) float32
         self._slot = 0
         self._k = 0
+        # ── per-slot MXFP8 scale state (Phase 8) ─────────────────────
+        # The scale belongs to the MMA that wrote the slot and must persist
+        # until that slot is drained (STORE is async). Applied at drain,
+        # exactly like the RTL: mma_unit holds these regfiles, store reads
+        # the matched element's scale at write-back.
+        self._mx = [0] * config.TMEM_SLOTS               # per-slot enable
+        self._sa = [np.full(m, E8M0_BIAS, np.uint8)      # per-slot M row scales
+                    for _ in range(config.TMEM_SLOTS)]
+        self._sb = [np.full(n, E8M0_BIAS, np.uint8)      # per-slot N col scales
+                    for _ in range(config.TMEM_SLOTS)]
 
     def start(self, a_tile: np.ndarray, b_tile: np.ndarray, slot: int,
-              accum: int, fmt: str):
+              accum: int, fmt: str, mx: int = 0,
+              scale_a: np.ndarray | None = None,
+              scale_b: np.ndarray | None = None):
         assert not self.busy, "MMA issued while array busy"
         self._a = decode_array(a_tile, fmt)
         self._b = decode_array(b_tile, fmt)
@@ -53,6 +66,12 @@ class MacArray:
         self._k = 0
         if not accum:
             self.tmem[:, :, slot] = np.float32(0)
+        # latch the slot's MX scale state (mx=0 clears it → plain drain)
+        self._mx[slot] = int(mx)
+        if mx:
+            assert scale_a is not None and scale_b is not None
+            self._sa[slot] = np.asarray(scale_a, np.uint8).copy()
+            self._sb[slot] = np.asarray(scale_b, np.uint8).copy()
         self.busy = True
 
     def tick(self):
@@ -69,6 +88,15 @@ class MacArray:
             self.done = True
 
     def drain_read(self, slot: int, idx: int) -> np.float32:
-        """Row-major element idx of an accumulator slot (STORE side)."""
+        """Row-major element idx of an accumulator slot (STORE side).
+
+        If the slot was written by an MX MMA, the per-element E8M0 scale is
+        applied here — the drain-time exponent add (bit-exact, golden twin).
+        mx=0 returns the raw accumulator, identical to the pre-Phase-8 path.
+        """
         m, n = config.MMA_M, config.MMA_N
-        return self.tmem[idx // n, idx % n, slot]
+        i, j = idx // n, idx % n
+        val = self.tmem[i, j, slot]
+        if self._mx[slot]:
+            return scale_value(val, int(self._sa[slot][i]), int(self._sb[slot][j]))
+        return val

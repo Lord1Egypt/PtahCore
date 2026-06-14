@@ -17,7 +17,9 @@ from cocotb.triggers import RisingEdge, ReadOnly, Timer
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+import config  # noqa: E402
 from golden.fp8 import decode_array  # noqa: E402
+from golden.mxfp8 import matmul_reference_mx  # noqa: E402
 
 M, N, K = 4, 4, 8
 TILE = M * K                      # 32 bytes (A and B same size here)
@@ -38,8 +40,13 @@ def _pack(op, bar=0, a16=0, b16=0, g32=0, n32=0, slot=0, accdt=0, fmt=0, s0=0, s
 
 def barinit(bar, c): return _pack(OP["BARINIT"], bar=bar, a16=c)
 def load(bar, g, s, n, gstep=0): return _pack(OP["LOAD"], bar=bar, a16=s, g32=g, n32=n, s0=gstep)
-def mma(bar, a, b, slot=0, accum=0, fmt=0):
-    return _pack(OP["MMA"], bar=bar, a16=a, b16=b, slot=slot, accdt=accum, fmt=fmt)
+def mma(bar, a, b, slot=0, accum=0, fmt=0, mx=0, sa=0, sb=0, sastep=0, sbstep=0):
+    # MXFP8 reuses the MMA-unused g32/n32 fields (+ bit 140), matching cmdproc.sv
+    g = (sa & 0xFFFF) | ((sb & 0xFFFF) << 16)
+    n = (sastep & 0xFFFF) | ((sbstep & 0xFFFF) << 16)
+    w = _pack(OP["MMA"], bar=bar, a16=a, b16=b, g32=g, n32=n,
+              slot=slot, accdt=accum, fmt=fmt)
+    return w | ((mx & 1) << 140)
 def store(bar, g, slot=0, dtype=0):
     return _pack(OP["STORE"], bar=bar, g32=g, slot=slot, accdt=dtype)
 def wait(bar): return _pack(OP["WAIT"], bar=bar)
@@ -182,6 +189,65 @@ async def single_tile_matmul_fp8_out(dut):
     got = np.frombuffer(bytes(mem[D_G:D_G + M * N]), dtype=np.uint8)
     for i in range(M * N):
         assert got[i] == want[i], f"D[{i}] = {got[i]:#04x} != {want[i]:#04x}"
+
+
+@cocotb.test()
+async def mxfp8_single_tile_fp32(dut):
+    """MXFP8 matmul through the whole chip — bit-exact vs the MX golden.
+
+    LOADs bring the A/B tiles AND the M+N E8M0 scale bytes into SMEM; the
+    MMA carries mx=1 + the scale bases; the scale is added to the fp32
+    exponent at drain in store (mx_scale.sv). mx=1 with unit scales would
+    equal the plain path; here the scales are non-trivial."""
+    rng = np.random.default_rng(40)
+    a = _rand(41, M, "e4m3")
+    b = _rand(42, N, "e4m3")
+    UNIT = config.E8M0_BIAS
+    sa = rng.integers(UNIT - 4, UNIT + 4, M, dtype=np.uint16).astype(np.uint8)
+    sb = rng.integers(UNIT - 4, UNIT + 4, N, dtype=np.uint16).astype(np.uint8)
+
+    A_G, B_G, SA_G, SB_G, D_G = 0, 64, 128, 160, 4096
+    mem = bytearray(8192)
+    mem[A_G:A_G + TILE] = a.tobytes()
+    mem[B_G:B_G + TILE] = b.tobytes()
+    mem[SA_G:SA_G + M] = sa.tobytes()          # E8M0 row scales (rest 0)
+    mem[SB_G:SB_G + N] = sb.tobytes()          # E8M0 col scales
+
+    await _reset(dut)
+    cocotb.start_soon(_dram(dut, mem))
+
+    SA, SB = BARRIER_REGION, BARRIER_REGION + TILE
+    # Scale bases are read as a single RD_BYTES (32-B) chunk, like operand
+    # fetches — 32-B aligned. And LOAD writes whole 32-B lines (smem_phys
+    # coalesces two 16-B beats), so the scale DMA is one 32-B line even
+    # though only M/N bytes are scales (the rest is don't-care padding).
+    SSA = SB + TILE                              # 320, 32-B aligned
+    SSB = SSA + 32                               # 352, 32-B aligned
+    await _push(dut, [
+        barinit(0, 4), barinit(1, 1), barinit(2, 1),
+        load(0, A_G, SA, TILE),
+        load(0, B_G, SB, TILE),
+        load(0, SA_G, SSA, 32),                 # full 32-B line (LOAD contract)
+        load(0, SB_G, SSB, 32),
+        wait(0),
+        mma(1, SA, SB, slot=0, accum=0, mx=1, sa=SSA, sb=SSB),
+        wait(1),
+        store(2, D_G, slot=0, dtype=0),
+        wait(2),
+    ])
+    for _ in range(4000):
+        await RisingEdge(dut.clk)
+        if int(dut.idle.value):
+            break
+    else:
+        assert False, "chip never went idle (mxfp8)"
+    for _ in range(8):
+        await RisingEdge(dut.clk)
+
+    ref = matmul_reference_mx(a, b, sa, sb, "e4m3").ravel()
+    got = np.frombuffer(bytes(mem[D_G:D_G + M * N * 4]), dtype="<f4")
+    for i in range(M * N):
+        assert got[i] == ref[i], f"D[{i}] = {got[i]} != {ref[i]}"
 
 
 @cocotb.test()

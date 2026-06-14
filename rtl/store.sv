@@ -42,6 +42,16 @@ module store #(
     output logic [$clog2(M*N)-1:0] drain_idx,
     input  wire  [31:0]        drain_data,
 
+    // MXFP8 scale lookup (Phase 8). drain_data answers wr_idx_q (the index
+    // requested DRAIN_LAT cycles ago) — so the matched per-element E8M0
+    // scale is fetched here, at write-back, and applied combinationally.
+    // mma_unit holds the per-slot scale regfile and answers this lookup;
+    // mx_en=0 (no MX, or mx=0 MMA) makes the scale a passthrough.
+    output logic [$clog2(M*N)-1:0] mx_idx,    // = wr_idx_q (matched index)
+    input  wire                mx_en,
+    input  wire  [7:0]         mx_ea,
+    input  wire  [7:0]         mx_eb,
+
     // gmem write port (byte-enable style: nbytes ∈ {1, 4})
     output logic               gmem_wr_en,
     output logic [GMEM_AW-1:0] gmem_wr_addr,
@@ -77,14 +87,23 @@ module store #(
     logic row_bubble;
     assign row_bubble = req_active && (idx_q[NW-1:0] == '0) && !settled_q;
 
+    // MXFP8 scale applied to the drained fp32 BEFORE fp8 encode / fp32
+    // write. wr_idx_q is the index matched to drain_data this cycle, so
+    // mx_idx drives mma_unit's per-element scale lookup with the right
+    // (row, col). Combinational — drain latency unchanged (mx_en=0 ⇒ noop).
+    assign mx_idx = wr_idx_q[$clog2(ELEMS)-1:0];
+    logic [31:0] scaled_data;
+    mx_scale u_mx (.in32(drain_data), .ea(mx_ea), .eb(mx_eb),
+                   .en(mx_en), .out32(scaled_data));
+
     logic [7:0] enc8;
-    fp8_encode u_enc (.in32(drain_data), .out8(enc8));
+    fp8_encode u_enc (.in32(scaled_data), .out8(enc8));
 
     assign drain_idx    = idx_q[$clog2(ELEMS)-1:0];
     assign gmem_wr_en   = wr_v_q;
     assign gmem_wr_addr = dtype_q ? (g_q + GMEM_AW'(wr_idx_q))
                                   : (g_q + (GMEM_AW'(wr_idx_q) << 2));
-    assign gmem_wr_data = dtype_q ? {24'h0, enc8} : drain_data;
+    assign gmem_wr_data = dtype_q ? {24'h0, enc8} : scaled_data;
     assign gmem_wr_nbytes = dtype_q ? 3'd1 : 3'd4;
 
     always_ff @(posedge clk) begin

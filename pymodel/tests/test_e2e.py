@@ -10,6 +10,7 @@ import numpy as np
 import config
 from golden.fp8 import decode_array
 from golden.matmul_reference import matmul_reference
+from golden.mxfp8 import E8M0_BIAS, matmul_reference_mx
 from pymodel.isa import BarInit, Load, Mma, Store, Wait, Repeat
 from pymodel.sim import Sim
 
@@ -137,6 +138,82 @@ def test_async_store_overlaps_next_load():
     assert sim.smem.read(SNEXT, 256) == bytes(range(256))
     np.testing.assert_array_equal(sim.read_result_fp32(D_G),
                                   matmul_reference(a, b, "e4m3"))
+
+
+def test_mxfp8_single_tile_fp32():
+    """Full MXFP8 matmul through the Sim — bit-exact vs the MX golden.
+
+    LOAD brings the A/B tiles AND the M+N E8M0 scale bytes into SMEM; the
+    MMA carries mx=1 + the scale bases; the scale is applied at drain.
+    """
+    rng = np.random.default_rng(20)
+    M, N, K = config.MMA_M, config.MMA_N, config.MMA_K
+    a = _scrubbed_tile(rng, M)
+    b = _scrubbed_tile(rng, N)
+    sa = rng.integers(E8M0_BIAS - 8, E8M0_BIAS + 8, M, dtype=np.uint16).astype(np.uint8)
+    sb = rng.integers(E8M0_BIAS - 8, E8M0_BIAS + 8, N, dtype=np.uint16).astype(np.uint8)
+
+    sim = Sim()
+    A_G, B_G, SA_G, SB_G, D_G = 0, 0x4000, 0x8000, 0x9000, 0x10000
+    sim.gmem.write(A_G, a.tobytes())
+    sim.gmem.write(B_G, b.tobytes())
+    sim.gmem.write(SA_G, sa.tobytes())
+    sim.gmem.write(SB_G, sb.tobytes())
+
+    SA = config.BARRIER_REGION          # A tile
+    SB = SA + a.nbytes                   # B tile
+    SSA = SB + b.nbytes                  # A scales (M bytes, padded to 16)
+    SSB = SSA + _round16(M)              # B scales (N bytes)
+
+    sim.push_program([
+        BarInit(0, 4), BarInit(1, 1), BarInit(2, 1),
+        Load(0, A_G, SA, a.nbytes),
+        Load(0, B_G, SB, b.nbytes),
+        Load(0, SA_G, SSA, _round16(M)),     # scales, 16-B aligned DMA
+        Load(0, SB_G, SSB, _round16(N)),
+        Wait(0),
+        Mma(1, SA, SB, slot=0, accum=0, mx=1, sa_smem=SSA, sb_smem=SSB),
+        Wait(1),
+        Store(2, D_G, slot=0, dtype=0),
+        Wait(2),
+    ])
+    sim.run()
+    np.testing.assert_array_equal(sim.read_result_fp32(D_G),
+                                  matmul_reference_mx(a, b, sa, sb, "e4m3"))
+
+
+def test_mxfp8_unit_scales_match_plain():
+    """mx=1 with all-unit E8M0 scales == the plain (mx=0) matmul, exactly."""
+    rng = np.random.default_rng(21)
+    M, N = config.MMA_M, config.MMA_N
+    a = _scrubbed_tile(rng, M)
+    b = _scrubbed_tile(rng, N)
+    sa = np.full(M, E8M0_BIAS, np.uint8)
+    sb = np.full(N, E8M0_BIAS, np.uint8)
+
+    sim = Sim()
+    A_G, B_G, SA_G, SB_G, D_G = 0, 0x4000, 0x8000, 0x9000, 0x10000
+    sim.gmem.write(A_G, a.tobytes()); sim.gmem.write(B_G, b.tobytes())
+    sim.gmem.write(SA_G, sa.tobytes()); sim.gmem.write(SB_G, sb.tobytes())
+    SA = config.BARRIER_REGION
+    SB = SA + a.nbytes
+    SSA = SB + b.nbytes
+    SSB = SSA + _round16(M)
+    sim.push_program([
+        BarInit(0, 4), BarInit(1, 1), BarInit(2, 1),
+        Load(0, A_G, SA, a.nbytes), Load(0, B_G, SB, b.nbytes),
+        Load(0, SA_G, SSA, _round16(M)), Load(0, SB_G, SSB, _round16(N)),
+        Wait(0),
+        Mma(1, SA, SB, slot=0, accum=0, mx=1, sa_smem=SSA, sb_smem=SSB),
+        Wait(1), Store(2, D_G, slot=0, dtype=0), Wait(2),
+    ])
+    sim.run()
+    np.testing.assert_array_equal(sim.read_result_fp32(D_G),
+                                  matmul_reference(a, b, "e4m3"))
+
+
+def _round16(n):
+    return (n + 15) & ~15
 
 
 def test_fp8_output_roundtrip():

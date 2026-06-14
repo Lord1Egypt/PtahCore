@@ -77,6 +77,9 @@ async def _store_run(dut, tile_f32, dtype):
     dut.rst.value = 1
     dut.start.value = 0
     dut.drain_data.value = 0
+    dut.mx_en.value = 0             # MXFP8 off — scale block is a passthrough
+    dut.mx_ea.value = 0
+    dut.mx_eb.value = 0
     await RisingEdge(dut.clk)
     await RisingEdge(dut.clk)
     dut.rst.value = 0

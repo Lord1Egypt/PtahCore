@@ -50,8 +50,12 @@ ifeq ($(TOP),load)
   MODULE = test_load_store
 endif
 ifeq ($(TOP),store)
-  VERILOG_SOURCES = $(RTL)/fp8_encode.sv $(RTL)/store.sv
+  VERILOG_SOURCES = $(RTL)/fp8_encode.sv $(RTL)/mx_scale.sv $(RTL)/store.sv
   MODULE = test_load_store
+endif
+ifeq ($(TOP),mx_scale)
+  VERILOG_SOURCES = $(RTL)/mx_scale.sv
+  MODULE = test_mx_scale
 endif
 ifeq ($(TOP),mac_tile)
   VERILOG_SOURCES = $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv
@@ -88,7 +92,7 @@ ifeq ($(TOP),chip_top)
     $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv $(RTL)/mac_grid.sv \
     $(RTL)/mac_array.sv $(RTL)/mma_unit.sv $(RTL)/fakeram7_256x256.sv \
     $(RTL)/smem_phys.sv $(RTL)/ptah_clkbuf.sv $(RTL)/clk_spine.sv \
-    $(RTL)/barrier.sv \
+    $(RTL)/barrier.sv $(RTL)/mx_scale.sv \
     $(RTL)/load.sv $(RTL)/store.sv $(RTL)/cmdproc.sv $(RTL)/chip_top.sv
   MODULE = test_chip_top
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
