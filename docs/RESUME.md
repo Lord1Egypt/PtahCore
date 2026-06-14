@@ -20,7 +20,8 @@ laptop using the ordered steps below.
 | #23 | 9a | 2:4 sparsity format + golden + pymodel — bit-exact + 2× throughput by step count. | no |
 | #24 | 9b-i | `sparse_select.sv` — per-cell 2-of-4 mux primitive, verified vs golden. | no |
 | #25 | 9b-ii | `mac_array_sparse.sv` — full 2:4 sparse compute datapath in RTL (K/2 steps, reuses untouched `mac_cell`), bit-exact. | no |
-| (this) | 10 | 64×64 config scalability proof (`pymodel/tests/test_scale.py`). | no |
+| #26 | 10 | 64×64 config scalability — pymodel (`test_scale.py`). | no |
+| (this) | 10 | 64×64 config — **RTL** evidence: `synth/lint_64.sh` (verilator lint of mac_array/mma_unit/chip_top at MMA_M=N=K=64) + `make sim TOP=mac_array_big` (bit-exact sim at non-native 64×4×64, M&K past 32). | no |
 
 **`mx=0` and `sparse=0` are bit-identical to the pre-Phase-8 design**, so the
 five existing GDS paths are undisturbed by the RTL changes.
@@ -31,8 +32,10 @@ five existing GDS paths are undisturbed by the RTL changes.
 pip install "cocotb<2" yowasp-yosys numpy pytest   # + apt-get install verilator (5.020)
 export LANG=C.UTF-8 PYTHONIOENCODING=utf-8          # silence em-dash logger noise
 cd rtl/tb && make all_leaves        # 20 RTL units, 73 cocotb tests, FAIL=0
+make sim TOP=mac_array_big          # bit-exact RTL sim at non-native 48×48×16
 cd ../.. && pytest golden pymodel -q # 102 Python tests
 yowasp-yosys -s synth/elaborate.ys  # elaborates clean, no inferred latches
+sh synth/lint_64.sh                  # RTL lints CLEAN at 64×64×64 (3 tops)
 ```
 Trust `rtl/tb/check_results.py` / the `PASS=/FAIL=` line, not the make exit
 code (cocotb 1.x exits 0 on failures).

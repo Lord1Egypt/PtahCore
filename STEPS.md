@@ -434,13 +434,23 @@ so their SMEM base is 32-B aligned and the LOAD DMA writes a full 32-B line
         (mac_array_sparse.sv, sparse_select.sv, docs/SPARSITY.md).
 
 ## Phase 10 — Stretch
-- [x] **64×64 config build — RTL/model side** (2026-06-14) — the design is
-      parameterized via config.py (MMA_M/N/K), read at runtime by every
-      model. `pymodel/tests/test_scale.py` drives the FULL pymodel (cmdproc
-      → load → array → store) at 16×16×16, **64×64×64**, and 64×32×16,
-      bit-exact vs golden, plus MXFP8 at 64×64 — proving the whole stack
-      scales. 102 Python tests green. (The 64×64 **GDS** is a P&R re-run →
-      Docker.)
+- [x] **64×64 config build — RTL + model side** (2026-06-14) — proven at
+      BOTH layers (they're independent codebases):
+  - **model:** `pymodel/tests/test_scale.py` drives the FULL pymodel
+    (cmdproc→load→array→store) at 16×16×16, **64×64×64**, 64×32×16
+    bit-exact vs golden + MXFP8 at 64×64. (proves the algorithm scales)
+  - **RTL elaboration:** `sh synth/lint_64.sh` — `verilator --lint-only`
+    of mac_array, mma_unit, **and chip_top at MMA_M=N=K=64**: zero errors
+    (catches the width/generate bugs the pymodel can't). (proves the
+    Verilog's bit-widths/generates hold at 64)
+  - **RTL bit-exact sim:** `make sim TOP=mac_array_big` runs mac_array at
+    a non-native **64×4×64** (M and K past the native 32), bit-exact vs
+    golden incl. accumulate. (proves the parameterized RTL *functions* at
+    a shape it was never built at; N kept small so the cell count stays
+    tractable — the 64×64 widths are covered by the lint above)
+  - Verified: 102 Python tests, 20 all_leaves RTL units, the standalone
+    `mac_array_big` sim, and the 64×64×64 lint — all green. (The 64×64
+    **GDS** is a P&R re-run → Docker.)
 - [ ] **Multi-shape MMA (M/N/K operand fields return)** — Docker-free RTL
       feature, NOT yet done. A runtime per-MMA shape (M/N/K ≤ native, mask
       the surplus rows/cols/K-steps) touching the ISA (new operand fields),

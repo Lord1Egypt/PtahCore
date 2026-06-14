@@ -67,6 +67,21 @@ ifeq ($(TOP),mac_array_sparse)
   MODULE = test_mac_array_sparse
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
 endif
+# Phase 10: mac_array at a NON-NATIVE large shape (M,N past 32) — proves the
+# Verilog parameterizes, not just the pymodel. Shape in one place (BIG_*).
+ifeq ($(TOP),mac_array_big)
+  # M and K past the native 32 (N kept small so the cell count — and the
+  # Verilator/g++ build — stays tractable; the 64×64×64 widths are covered
+  # by synth/lint_64.sh, this proves the parameterized logic FUNCTIONS).
+  BIG_M ?= 64
+  BIG_N ?= 4
+  BIG_K ?= 64
+  export BIG_M BIG_N BIG_K
+  VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv $(RTL)/mac_grid.sv $(RTL)/mac_array.sv
+  MODULE = test_mac_array_big
+  TOPLEVEL := mac_array          # build dir is mac_array_big; module is mac_array
+  COMPILE_ARGS += -GM=$(BIG_M) -GN=$(BIG_N) -GK=$(BIG_K) -Wno-WIDTHCONCAT --output-split 20000
+endif
 ifeq ($(TOP),mac_tile)
   VERILOG_SOURCES = $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv
   MODULE = test_mac_tile
@@ -108,6 +123,6 @@ ifeq ($(TOP),chip_top)
   COMPILE_ARGS += -GM=4 -GN=4 -GK=8
 endif
 
-TOPLEVEL = $(TOP)
+TOPLEVEL ?= $(TOP)
 
 include $(shell cocotb-config --makefiles)/Makefile.sim
