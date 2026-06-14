@@ -37,6 +37,7 @@ all_leaves:
 	$(MAKE) sim TOP=mac_row
 	$(MAKE) sim TOP=mac_grid
 	$(MAKE) sim TOP=mac_array
+	$(MAKE) sim TOP=mac_array_sparse
 	$(MAKE) sim TOP=cmdproc_tb_top
 	$(MAKE) sim TOP=mma_unit
 	$(MAKE) sim TOP=chip_top

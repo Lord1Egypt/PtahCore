@@ -11,8 +11,9 @@ is bit-identical to the dense matmul of the decompressed A; the win is
 |-------|-------|
 | Format + golden reference | ✅ `golden/sparse24.py` (Phase 9a) |
 | pymodel (K/2 steps, per-row B gather) | ✅ `pymodel/` (Phase 9a) — bit-exact + 2× proven by step count |
-| RTL select primitive | ✅ `rtl/sparse_select.sv` (Phase 9b) — the per-cell 2-of-4 mux, verified vs golden |
-| RTL array integration | ⬜ **the redesign below** — invalidates the abutted GDS, needs Docker to re-harden |
+| RTL select primitive | ✅ `rtl/sparse_select.sv` (Phase 9b-i) — the per-cell 2-of-4 mux, verified vs golden |
+| RTL sparse compute datapath | ✅ `rtl/mac_array_sparse.sv` (Phase 9b-ii) — full K/2-step sparse array, per-cell select feeding the untouched mac_cell, bit-exact + 2× by cycle count |
+| Abutted-array integration + GDS | ⬜ **9b-iii below** — fold the select into the traveling-clock tile; invalidates the GDS abstracts, needs Docker to re-harden |
 
 ## Format
 
@@ -51,11 +52,20 @@ with its row's metadata — one `sparse_select` per cell. That means:
 3. **`mac_array` / `mma_unit`** sequence K/2 group-steps (vs K), present the
    group window, and fetch `a_vals` + `a_meta` instead of the dense tile.
 
-Because step 2 rewrites the hardened, abutted, traveling-clock array (the
-project's headline GDS) and invalidates its abstracts, it is scoped as a
-deliberate, reviewed pass and run on the Docker/OpenROAD machine — the same
-place the Phase 8/9 GDS land. The Docker-free correctness + throughput proof
-(golden + pymodel) and the verified select primitive are complete and in
-tree, so the redesign starts from a proven datapath block and a bit-exact
-reference, with `sparse=0` held bit-identical throughout (the `mx=0`
-discipline from Phase 8).
+### What is already proven in RTL (Docker-free)
+
+`rtl/mac_array_sparse.sv` is the **full sparse compute datapath in real
+RTL** — it does step 1 (the per-cell 2-of-4 select) and step 3 (K/2-step
+sequencing, compressed-A operands) on a flat array, reusing the **untouched**
+`mac_cell` leaf, and is verified bit-exact vs golden plus the 2× throughput
+by cycle count (`test_mac_array_sparse`). It deliberately does NOT use the
+abutted `mac_grid`, so none of the five hardened GDS modules change.
+
+The only remaining piece (**9b-iii**) is step 2: folding that proven select
+into the abutted, traveling-clock tile — widening `mac_tile`'s B feedthrough
+1→4 lanes and routing `meta_sel` east with the A wave. That changes the
+physical tile pins, so it invalidates the GDS abstracts and is bundled with
+the chip re-harden on the Docker/OpenROAD machine. It starts from a proven
+datapath block (`mac_array_sparse.sv`), the verified primitive
+(`sparse_select.sv`), and a bit-exact reference (golden + pymodel), holding
+`sparse=0` bit-identical throughout (the `mx=0` discipline from Phase 8).
