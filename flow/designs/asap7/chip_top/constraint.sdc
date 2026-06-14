@@ -279,6 +279,15 @@ create_generated_clock -name lb_31 -source [get_ports clk_spine] -divide_by 1 $_
 set_clock_latency -source 4281.68 [get_clocks lb_31]
 set_clock_uncertainty 100 [get_clocks lb_31]
 
+# dont_touch the launch clock nets: repair_design builds a buffer
+# TREE for each 32-fanout launch net, and those buffers land along
+# the net's path toward the grid edge — some inside the grid macro,
+# where detailed placement cannot legalize them (DPL-0036, the
+# whole 2026-06-14 night). These nets are modeled as ideal,
+# un-treed generated clocks anyway (stagger preserved), so there is
+# nothing to buffer. This is what stops the stranding at the root.
+set_dont_touch [get_nets {clk_lw_buf[*] clk_lb_buf[*]}]
+
 # Host/GMEM interface — behavioral-controller contract (CHIP_SPEC §6).
 set_input_delay  -clock clk 800 [get_ports {rst push_en push_instr[*] gmem_rd_data[*]}]
 set_output_delay -clock clk 800 [get_ports {fifo_full idle gmem_rd_addr[*] gmem_wr_en gmem_wr_addr[*] gmem_wr_data[*] gmem_wr_nbytes[*]}]
