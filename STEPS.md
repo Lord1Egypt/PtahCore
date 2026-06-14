@@ -434,6 +434,19 @@ so their SMEM base is 32-B aligned and the LOAD DMA writes a full 32-B line
         (mac_array_sparse.sv, sparse_select.sv, docs/SPARSITY.md).
 
 ## Phase 10 — Stretch
-- [ ] 64×64 config build
-- [ ] Multi-shape MMA (M/N/K operand fields return)
-- [ ] GDS gallery + blog-style writeup in repo
+- [x] **64×64 config build — RTL/model side** (2026-06-14) — the design is
+      parameterized via config.py (MMA_M/N/K), read at runtime by every
+      model. `pymodel/tests/test_scale.py` drives the FULL pymodel (cmdproc
+      → load → array → store) at 16×16×16, **64×64×64**, and 64×32×16,
+      bit-exact vs golden, plus MXFP8 at 64×64 — proving the whole stack
+      scales. 102 Python tests green. (The 64×64 **GDS** is a P&R re-run →
+      Docker.)
+- [ ] **Multi-shape MMA (M/N/K operand fields return)** — Docker-free RTL
+      feature, NOT yet done. A runtime per-MMA shape (M/N/K ≤ native, mask
+      the surplus rows/cols/K-steps) touching the ISA (new operand fields),
+      cmdproc decode, mma_unit, and array masking. Scoped out this session
+      to keep the tree clean; the next Docker-free task. (config-time
+      reshape is already proven by test_scale.py; this is *per-instruction*
+      shape.)
+- [ ] GDS gallery + blog-style writeup — the writeup is Docker-free; the
+      gallery images come from the GDS artifacts (Docker).
