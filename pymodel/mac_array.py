@@ -44,6 +44,9 @@ class MacArray:
         self._b = None      # (N, K) float32
         self._slot = 0
         self._k = 0
+        self._nsteps = config.MMA_K   # K dense, K/2 sparse (set at start)
+        self._sparse = 0
+        self._a_meta = None
         # ── per-slot MXFP8 scale state (Phase 8) ─────────────────────
         # The scale belongs to the MMA that wrote the slot and must persist
         # until that slot is drained (STORE is async). Applied at drain,
@@ -58,12 +61,24 @@ class MacArray:
     def start(self, a_tile: np.ndarray, b_tile: np.ndarray, slot: int,
               accum: int, fmt: str, mx: int = 0,
               scale_a: np.ndarray | None = None,
-              scale_b: np.ndarray | None = None):
+              scale_b: np.ndarray | None = None,
+              sparse: int = 0, a_meta: np.ndarray | None = None):
         assert not self.busy, "MMA issued while array busy"
+        # 2:4 sparse: a_tile is the compressed M×(K/2) kept values; the
+        # array runs K/2 steps, gathering B per-row by the metadata. Dense:
+        # the full M×K tile, K steps. Both accumulate in ascending k order,
+        # so the sparse sum equals the dense (zero lanes are exact no-ops).
+        self._sparse = int(sparse)
         self._a = decode_array(a_tile, fmt)
         self._b = decode_array(b_tile, fmt)
         self._slot = slot
         self._k = 0
+        if sparse:
+            assert a_meta is not None
+            self._a_meta = np.asarray(a_meta, np.uint8)
+            self._nsteps = config.MMA_K // 2
+        else:
+            self._nsteps = config.MMA_K
         if not accum:
             self.tmem[:, :, slot] = np.float32(0)
         # latch the slot's MX scale state (mx=0 clears it → plain drain)
@@ -78,12 +93,21 @@ class MacArray:
         self.done = False
         if not self.busy:
             return
-        k = self._k
-        # one K-step per cycle: rank-1 update in fp32
-        prod = (self._a[:, k:k + 1] * self._b[:, k:k + 1].T).astype(np.float32)
+        s = self._k
+        if self._sparse:
+            # step s → group g, kept-slot (0/1); each row selects its own
+            # B column from the group via metadata (per-row gather).
+            g, which = s // 2, s % 2
+            pos = (self._a_meta[:, g] >> (2 * which)) & 0b11   # (M,)
+            actual_k = 4 * g + pos                             # (M,)
+            bsel = self._b[:, actual_k].T                      # (M, N)
+            prod = (self._a[:, s:s + 1] * bsel).astype(np.float32)
+        else:
+            # one K-step per cycle: rank-1 update in fp32
+            prod = (self._a[:, s:s + 1] * self._b[:, s:s + 1].T).astype(np.float32)
         self.tmem[:, :, self._slot] += prod
         self._k += 1
-        if self._k == config.MMA_K:
+        if self._k == self._nsteps:
             self.busy = False
             self.done = True
 
