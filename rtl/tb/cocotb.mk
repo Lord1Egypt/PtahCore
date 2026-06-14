@@ -62,6 +62,11 @@ ifeq ($(TOP),sparse_select)
   MODULE = test_sparse_select
   COMPILE_ARGS += -GW=32
 endif
+ifeq ($(TOP),mac_array_sparse)
+  VERILOG_SOURCES = $(RTL)/fp8_decode.sv $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_array_sparse.sv
+  MODULE = test_mac_array_sparse
+  COMPILE_ARGS += -GM=4 -GN=4 -GK=8
+endif
 ifeq ($(TOP),mac_tile)
   VERILOG_SOURCES = $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv
   MODULE = test_mac_tile

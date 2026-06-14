@@ -418,11 +418,20 @@ so their SMEM base is 32-B aligned and the LOAD DMA writes a full 32-B line
         (the reusable HW primitive), cocotb twin vs golden (`test_sparse_
         select`), bit-exact. Zero-risk additive module — no hardened path
         touched. `docs/SPARSITY.md` specs the array integration.
-  - [ ] **9b-ii:** array integration — widen B feedthrough 1→4 lanes +
-        per-row metadata routing through mac_cell/tile/grid, K/2-step
-        sequencing, mma_unit compressed-A fetch. This rewrites the abutted
-        traveling-clock array and **invalidates the 5 GDS abstracts** →
-        deliberate reviewed pass on the Docker machine (see docs/SPARSITY.md).
+  - [x] **9b-ii:** `rtl/mac_array_sparse.sv` — the full 2:4 sparse COMPUTE
+        datapath proven in real RTL: per-row a_vals/meta + per-column 4-lane
+        B window, a per-cell 2-of-4 mux feeding the **untouched** mac_cell,
+        K/2-step sequencing. cocotb (`test_mac_array_sparse`): bit-exact vs
+        golden (matmul + accumulate) and the K/2 throughput verified by
+        cycle count. Reuses the verified mac_cell leaf and touches **no**
+        hardened/abutted module → dense GDS path 100% intact.
+  - [ ] **9b-iii (Docker):** fold the per-cell select into the abutted
+        traveling-clock array — widen the mac_tile B feedthrough 1→4 lanes +
+        route meta_sel, then re-harden. This is the only sparse step that
+        changes the physical tile (invalidates the GDS abstracts), so it is
+        bundled with the chip re-harden. The RTL datapath + bit-exact
+        reference + verified primitive are all in tree to build from
+        (mac_array_sparse.sv, sparse_select.sv, docs/SPARSITY.md).
 
 ## Phase 10 — Stretch
 - [ ] 64×64 config build
