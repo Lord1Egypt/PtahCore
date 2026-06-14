@@ -54,6 +54,15 @@ class Mma:
     sb_smem: int = 0  # SMEM offset of the N E8M0 col scales
     sastep: int = 0   # per-REPEAT-iteration stride on sa_smem
     sbstep: int = 0   # per-REPEAT-iteration stride on sb_smem
+    # ── 2:4 structured sparsity (Phase 9) ────────────────────────────
+    # sparse=0 is the dense MMA. sparse=1: A is 2:4-compressed — a_smem
+    # holds the M×(K/2) kept fp8 values, meta_smem the M×(K/4) metadata
+    # bytes. The array runs K/2 steps (the two zero lanes per group are
+    # skipped → ~2× throughput); the result equals the dense matmul of the
+    # decompressed A (golden/sparse24.py).
+    sparse: int = 0
+    meta_smem: int = 0   # SMEM offset of the M×(K/4) 2:4 metadata bytes
+    mstep: int = 0       # per-REPEAT-iteration stride on meta_smem
 
 
 @dataclass

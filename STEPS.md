@@ -395,7 +395,25 @@ so their SMEM base is 32-B aligned and the LOAD DMA writes a full 32-B line
 (smem_phys coalesces 16-B beats).
 
 ## Phase 9 — 2:4 structured sparsity
-- [ ] Metadata format; sparse operand select in mac_cell; 2× throughput e2e proof
+- [x] **Phase 9a: format + golden + pymodel** (2026-06-14, branch
+      `feat/phase9-sparse24`) — 2:4 sparsity on A along K: every group of 4
+      K-lanes keeps 2 nonzeros. Compressed A = M×(K/2) kept fp8 values +
+      M×(K/4) metadata (two 2-bit kept-lane indices/group). **golden/
+      sparse24.py**: compress/decompress, `matmul_reference_sparse`, the
+      contract that a 2:4-sparse matmul == the dense matmul of the
+      decompressed A (zero lanes are exact fp32 no-ops, ascending-k order
+      preserved). 12 golden tests. **pymodel**: `Mma` gains `sparse`/
+      `meta_smem`; MacArray runs **K/2 array steps** with per-row B gather
+      by metadata → bit-exact vs golden AND the 2× throughput proven by
+      step count. e2e through the Sim bit-exact. `sparse=0` unchanged
+      (dense path bit-identical). 98 Python tests green.
+- [ ] **Phase 9b: RTL sparse-select datapath + 2× throughput** — the
+      invasive part: in the broadcast array, each row's PE must select 2 of
+      4 B lanes per group from its OWN metadata (B is broadcast a 4-lane
+      group window; each cell muxes). Touches mac_cell/array + mma_unit
+      fetch (a_vals + metadata). `sparse=0` must stay bit-identical so the
+      five GDS paths are undisturbed (the mx=0 discipline). Then the GDS
+      (needs Docker).
 
 ## Phase 10 — Stretch
 - [ ] 64×64 config build

@@ -137,7 +137,8 @@ class CmdProc:
             b_off = instr.b_smem + i * instr.bstep
             sa_off = instr.sa_smem + i * instr.sastep
             sb_off = instr.sb_smem + i * instr.sbstep
-            self._fire_mma(instr, a_off, b_off, sa_off, sb_off)
+            meta_off = instr.meta_smem + i * instr.mstep
+            self._fire_mma(instr, a_off, b_off, sa_off, sb_off, meta_off)
             return True
 
         if isinstance(instr, Store):
@@ -158,11 +159,19 @@ class CmdProc:
         raise ValueError(f"unknown instruction {instr}")
 
     def _fire_mma(self, instr: Mma, a_off: int, b_off: int,
-                  sa_off: int = 0, sb_off: int = 0):
+                  sa_off: int = 0, sb_off: int = 0, meta_off: int = 0):
         import numpy as np
         m, n, k = config.MMA_M, config.MMA_N, config.MMA_K
-        a = np.frombuffer(self._smem_read(a_off, m * k), dtype=np.uint8).reshape(m, k)
         b = np.frombuffer(self._smem_read(b_off, n * k), dtype=np.uint8).reshape(n, k)
+        a_meta = None
+        if instr.sparse:
+            # A is 2:4-compressed: M×(K/2) kept values + M×(K/4) metadata.
+            a = np.frombuffer(self._smem_read(a_off, m * (k // 2)),
+                              dtype=np.uint8).reshape(m, k // 2)
+            a_meta = np.frombuffer(self._smem_read(meta_off, m * (k // 4)),
+                                   dtype=np.uint8).reshape(m, k // 4)
+        else:
+            a = np.frombuffer(self._smem_read(a_off, m * k), dtype=np.uint8).reshape(m, k)
         assert self.store.draining_slot != instr.slot, (
             "MMA targets a slot mid-drain")
         sa = sb = None
@@ -172,7 +181,8 @@ class CmdProc:
             sa = np.frombuffer(self._smem_read(sa_off, m), dtype=np.uint8)
             sb = np.frombuffer(self._smem_read(sb_off, n), dtype=np.uint8)
         self.array.start(a, b, instr.slot, instr.accum, instr.fmt,
-                         mx=instr.mx, scale_a=sa, scale_b=sb)
+                         mx=instr.mx, scale_a=sa, scale_b=sb,
+                         sparse=instr.sparse, a_meta=a_meta)
         self._mma_bar = instr.bar   # arrival fires from sim when array.done
 
     def _smem_read(self, off, n):

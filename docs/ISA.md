@@ -29,6 +29,11 @@ No general-purpose register file. Operands are immediates.
   8-bit, value `2^(X-127)`, `X∈[0,254]` (`X=255`=NaN). With K=32 = one OCP
   MX block, A carries one scale per row (M), B one per column (N). Enabled
   per-MMA by `mx`; applied as a fp32 **exponent add** at drain.
+- **2:4 sparsity (Phase 9):** optional `sparse` flag — A is 2:4-compressed
+  along K (every group of 4 lanes keeps 2 nonzeros). A operand = M×(K/2)
+  kept fp8 values at `A_smem` + M×(K/4) metadata at `meta_smem` (two 2-bit
+  kept-lane indices/group). The array runs K/2 steps (~2×); the result
+  equals the dense matmul of the decompressed A.
 
 ## Barrier objects (mbarrier)
 

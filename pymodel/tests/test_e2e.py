@@ -11,6 +11,7 @@ import config
 from golden.fp8 import decode_array
 from golden.matmul_reference import matmul_reference
 from golden.mxfp8 import E8M0_BIAS, matmul_reference_mx
+from golden.sparse24 import compress, matmul_reference_sparse, random_sparse_a
 from pymodel.isa import BarInit, Load, Mma, Store, Wait, Repeat
 from pymodel.sim import Sim
 
@@ -214,6 +215,58 @@ def test_mxfp8_unit_scales_match_plain():
 
 def _round16(n):
     return (n + 15) & ~15
+
+
+def test_sparse24_single_tile_fp32():
+    """2:4-sparse matmul through the Sim — bit-exact vs the dense golden of
+    the decompressed A, and the MMA runs in K/2 array steps (2× throughput)."""
+    rng = np.random.default_rng(50)
+    M, N, K = config.MMA_M, config.MMA_N, config.MMA_K
+    dense_a = random_sparse_a(rng, M, K, "e4m3")
+    a_vals, a_meta = compress(dense_a)
+    b = _scrubbed_tile(rng, N)
+
+    sim = Sim()
+    AV_G, M_G, B_G, D_G = 0, 0x4000, 0x8000, 0x10000
+    sim.gmem.write(AV_G, a_vals.tobytes())
+    sim.gmem.write(M_G, a_meta.tobytes())
+    sim.gmem.write(B_G, b.tobytes())
+
+    SAV = config.BARRIER_REGION                  # compressed A values, M×(K/2)
+    SMETA = SAV + a_vals.nbytes                   # 2:4 metadata, M×(K/4)
+    SB = SMETA + a_meta.nbytes                     # B tile, N×K
+    sim.push_program([
+        BarInit(0, 3), BarInit(1, 1), BarInit(2, 1),
+        Load(0, AV_G, SAV, a_vals.nbytes),
+        Load(0, M_G, SMETA, a_meta.nbytes),
+        Load(0, B_G, SB, b.nbytes),
+        Wait(0),
+        Mma(1, SAV, SB, slot=0, accum=0, sparse=1, meta_smem=SMETA),
+        Wait(1),
+        Store(2, D_G, slot=0, dtype=0),
+        Wait(2),
+    ])
+    sim.run()
+    np.testing.assert_array_equal(
+        sim.read_result_fp32(D_G),
+        matmul_reference_sparse(a_vals, a_meta, b, "e4m3"))
+
+
+def test_sparse24_runs_half_the_array_steps():
+    """The throughput proof: a sparse MMA advances the array K/2 steps."""
+    rng = np.random.default_rng(51)
+    M, N, K = config.MMA_M, config.MMA_N, config.MMA_K
+    dense_a = random_sparse_a(rng, M, K, "e4m3")
+    a_vals, a_meta = compress(dense_a)
+
+    sim = Sim()
+    sim.array.start(a_vals, _scrubbed_tile(rng, N), slot=0, accum=0,
+                    fmt="e4m3", sparse=1, a_meta=a_meta)
+    steps = 0
+    while sim.array.busy:
+        sim.array.tick()
+        steps += 1
+    assert steps == K // 2, f"sparse MMA took {steps} steps, expected {K // 2}"
 
 
 def test_fp8_output_roundtrip():
