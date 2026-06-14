@@ -57,6 +57,11 @@ ifeq ($(TOP),mx_scale)
   VERILOG_SOURCES = $(RTL)/mx_scale.sv
   MODULE = test_mx_scale
 endif
+ifeq ($(TOP),sparse_select)
+  VERILOG_SOURCES = $(RTL)/sparse_select.sv
+  MODULE = test_sparse_select
+  COMPILE_ARGS += -GW=32
+endif
 ifeq ($(TOP),mac_tile)
   VERILOG_SOURCES = $(RTL)/fp32_mul.sv $(RTL)/fp32_add.sv $(RTL)/mac_cell.sv $(RTL)/mac_tile.sv
   MODULE = test_mac_tile
