@@ -1,5 +1,13 @@
 # PtahCore — Cloud Handoff (resume Phase 7d-3, the full-chip GDS)
 
+> **⚠ UPDATE 2026-06-14 (later):** a Docker-free session then landed
+> **Phases 8 (MXFP8), 9a/9b-i/9b-ii (2:4 sparsity), and the Phase-10 64×64
+> RTL scalability proof** — all merged into `feat/phase7d3-chip-flow`, all
+> bit-exact, `mx=0`/`sparse=0` bit-identical so these GDS notes still hold.
+> **Read `docs/RESUME.md` first** — it lists exactly what's done and the
+> ordered Docker/P&R steps that remain. This file's flow mechanics below
+> are still the accurate P&R reference.
+
 **For: a fresh Claude (or engineer) picking this up on a bigger machine.**
 **Written: 2026-06-14, after a long night of P&R on a RAM-limited (7.7 GB) WSL2 box.**
 
