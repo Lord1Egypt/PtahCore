@@ -11,15 +11,48 @@ Working checklist. Tick items via PR. Companion to [PLAN.md](PLAN.md).
 > abstract; PDN-0232/0233 design-local pdn.tcl; GPL runaway → timing/
 > routability driven OFF; DPL-0036 → -max_displacement 50).
 >
- **▶ STATUS 2026-06-13 ~17:10: flow runs clean SYNTH→FLOORPLAN→PDN→
-> PLACE→DETAIL-PLACE (DPL needs `-max_displacement 150` now, pass it as
-> a COMMAND-LINE ORFS_MAKE_ARGS override — editing config.mk re-runs
-> from synth; the 1.9 h repair stage 3_4 is cached). CTS half-solved:
-> the clk_s tap-driver fix WORKS (CTS trees clk_s_tap → 13-buf H-tree,
-> no ODB-037x). REMAINING BLOCKER = the stage-B launch-clock fork
-> below. Latest pushed commit d43104f; the 150 displacement is NOT yet
-> in config.mk (would bust the cache) — fold it in only on the final
-> clean run.**
+ **▶ STATUS 2026-06-14 ~05:30 — DPL is the live blocker; the launch-
+> clock fix (RTL buffers + 64 generated clocks) is BUILT + parses but
+> DPL won't legalize on this 7.7 GB machine. Repo is at the MEMORY-SAFE
+> TIGHT die (1674×1583). Latest pushed: 02476de was the wide-die attempt
+> (REVERTED in working tree — re-commit the tight die). The launch fix
+> commits (ac4a0d3 buffers+gen_constraints, d43104f tap-driver) stand.**
+>
+> **The DPL saga, fully mapped (don't re-walk it):** after adding the 64
+> launch-tap buffers (chip_top.sv lw_drv/lb_drv) + the 64-generated-clock
+> SDC, detailed placement (3_5) cannot legalize 1 repair buffer that
+> global-place drops loosely INSIDE the grid macro. Two DISTINCT walls,
+> do not confuse: (1) **CPU degeneration** — `-max_displacement` ≥170
+> makes the diamond search explore too many sites → 100% CPU, hours, no
+> progress (150 finishes-but-fails-by-1; the finish/degenerate cliff is
+> ~150–170, razor thin). (2) **MEMORY thrash** — widening the strips to
+> give the buffer room (W_STRIP 220) grew the die enough that the full
+> chip + 64-clock timing setup blew past 7.7 GB RAM → DPL at 11% CPU
+> swap-thrashing (RAM 7.6/7.9 G, +6.4 G swap). **The wide die can't fit
+> this flow on this machine — keep the die tight.** So neither lever
+> alone works: tight+small-disp strands 1 cell; tight+big-disp CPU-
+> degenerates; wide die memory-thrashes.
+>
+> **NEXT — solve the 1 stranded buffer WITHOUT die area or big
+> displacement (tight die, memory-safe). Candidates, try in order:**
+> (a) **why is a stdcell loosely placed 146 µm INSIDE a hard macro?** —
+> GPL_ROUTABILITY/TIMING_DRIVEN=0 (set for the array) may let global
+> place nudge cells onto the grid; try a bigger `MACRO_PLACE_HALO`
+> (2→8) or a placement blockage over the grid so GP never seeds cells
+> there. (b) reduce the repair buffers that strand — the cell is a
+> repair_design (3_4) BUFx16f on net6322/6323 (fanout 2); lower
+> `SETUP_SLACK_MARGIN` 100→0 (rely on post-route repair) so fewer
+> pre-route buffers are inserted. (c) ORFS `improve_placement`/DPO or a
+> targeted region for that one net. **Iterate FAST: the 1.9 h repair
+> (3_4) is the bottleneck — keep a cached 3_4 and re-run only 3_5 via
+> command-line DETAIL_PLACEMENT_ARGS; only bust the cache (config.mk/
+> SDC edit) when changing synth/floorplan.** A bigger-RAM host (≥16 G)
+> would also just let the wide die through — worth noting to the user.
+>
+> *(earlier 2026-06-13 status:)* flow ran clean SYNTH→…→DETAIL-PLACE;
+> CTS half-solved: the clk_s tap-driver fix WORKS (CTS trees clk_s_tap →
+> 13-buf H-tree, no ODB-037x). The stage-B launch-clock fork is the fix
+> now built (RTL buffers + generated clocks) but unverified past DPL.
 >
 > **▶ THE STAGE-B LAUNCH-CLOCK FORK (chosen path: SDC latency model):**
 > post-CTS hold repair dies (RSZ-0060) on `launch_b[*].b_q[*]` /
