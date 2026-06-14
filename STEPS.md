@@ -414,6 +414,15 @@ so their SMEM base is 32-B aligned and the LOAD DMA writes a full 32-B line
       fetch (a_vals + metadata). `sparse=0` must stay bit-identical so the
       five GDS paths are undisturbed (the mx=0 discipline). Then the GDS
       (needs Docker).
+  - [x] **9b-i:** `rtl/sparse_select.sv` — the per-cell 2-of-4 lane mux
+        (the reusable HW primitive), cocotb twin vs golden (`test_sparse_
+        select`), bit-exact. Zero-risk additive module — no hardened path
+        touched. `docs/SPARSITY.md` specs the array integration.
+  - [ ] **9b-ii:** array integration — widen B feedthrough 1→4 lanes +
+        per-row metadata routing through mac_cell/tile/grid, K/2-step
+        sequencing, mma_unit compressed-A fetch. This rewrites the abutted
+        traveling-clock array and **invalidates the 5 GDS abstracts** →
+        deliberate reviewed pass on the Docker machine (see docs/SPARSITY.md).
 
 ## Phase 10 — Stretch
 - [ ] 64×64 config build
