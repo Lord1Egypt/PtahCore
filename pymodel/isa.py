@@ -44,6 +44,16 @@ class Mma:
     fmt: str = "e4m3"
     astep: int = 0
     bstep: int = 0
+    # ── MXFP8 microscaling (Phase 8) ─────────────────────────────────
+    # mx=0 is bit-identical to a plain fp8 MMA. mx=1 enables per-block
+    # E8M0 scaling: sa_smem points at M E8M0 bytes (one scale per A row),
+    # sb_smem at N E8M0 bytes (one per B col). The scale is applied to the
+    # slot's accumulator at DRAIN — a pure exponent add (golden/mxfp8.py).
+    mx: int = 0
+    sa_smem: int = 0  # SMEM offset of the M E8M0 row scales
+    sb_smem: int = 0  # SMEM offset of the N E8M0 col scales
+    sastep: int = 0   # per-REPEAT-iteration stride on sa_smem
+    sbstep: int = 0   # per-REPEAT-iteration stride on sb_smem
 
 
 @dataclass

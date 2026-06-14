@@ -21,6 +21,12 @@
 //   [107]     fmt    MMA
 //   [123:108] s0     step0 (LOAD gstep / MMA astep / STORE gstep)
 //   [139:124] s1     step1 (LOAD sstep / MMA bstep)
+//   MMA-only MXFP8 (Phase 8) reuses g32/n32 (unused by MMA) + bit 140:
+//   [55:40]   sa     MMA scale_a base (E8M0, M bytes in SMEM)
+//   [71:56]   sb     MMA scale_b base (E8M0, N bytes in SMEM)
+//   [87:72]   sastep MMA scale_a per-REPEAT-iteration stride
+//   [103:88]  sbstep MMA scale_b stride
+//   [140]     mx     MMA microscaling enable (0 = plain fp8, default)
 
 `default_nettype none
 
@@ -60,6 +66,9 @@ module cmdproc #(
     output logic           mma_accum,
     output logic           mma_fmt,
     output logic [3:0]     mma_bar,
+    output logic           mma_mx,        // MXFP8 enable (Phase 8)
+    output logic [15:0]    mma_sa,        // scale_a base in SMEM
+    output logic [15:0]    mma_sb,        // scale_b base in SMEM
     input  wire            mma_busy,
 
     output logic           st_start,
@@ -130,12 +139,20 @@ module cmdproc #(
     wire        fmt   = cur[107];
     wire [15:0] s0    = cur[123:108];
     wire [15:0] s1    = cur[139:124];
+    // MMA MXFP8 fields (reuse g32/n32, unused by MMA, + bit 140)
+    wire        mx_f    = cur[140];
+    wire [15:0] sa16    = cur[55:40];
+    wire [15:0] sb16    = cur[71:56];
+    wire [15:0] sastep  = cur[87:72];
+    wire [15:0] sbstep  = cur[103:88];
 
     wire [15:0] it = replaying ? rep_iter : 16'd0;
     wire [31:0] eff_gmem = g32 + 32'(it) * 32'(s0);
     wire [15:0] eff_smem = a16 + it * s1;     // LOAD dst stride
     wire [15:0] eff_a    = a16 + it * s0;     // MMA A stride
     wire [15:0] eff_b    = b16 + it * s1;     // MMA B stride
+    wire [15:0] eff_sa   = sa16 + it * sastep; // MMA scale_a stride
+    wire [15:0] eff_sb   = sb16 + it * sbstep; // MMA scale_b stride
 
     // ── combinational decode: does this instr issue, and does it pop? ─
     // `issue` = the instruction is consumed this cycle (engine free etc).
@@ -230,6 +247,7 @@ module cmdproc #(
                         mma_a <= eff_a; mma_b <= eff_b;
                         mma_slot <= slot; mma_accum <= accdt; mma_fmt <= fmt;
                         mma_bar <= bar;
+                        mma_mx <= mx_f; mma_sa <= eff_sa; mma_sb <= eff_sb;
                     end
                     OP_STORE: begin
                         st_start <= 1'b1; st_iss_d <= 1'b1; st_bar <= bar;

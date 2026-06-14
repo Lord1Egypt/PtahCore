@@ -18,6 +18,16 @@ MMA_K = 32          # inner (reduction) dimension
 FP8_FORMATS = ("e4m3", "e5m2")   # both supported per-instruction (fmt flag)
 ACCUM_WIDTH = 32                 # fp32 accumulate
 
+# ── MXFP8 microscaling (Phase 8, OCP MX spec) ────────────────────────
+# K == MMA_K is exactly one MX block, so scales are per-row (A) / per-col
+# (B): M E8M0 bytes for A, N for B. The shared E8M0 scale is a power of
+# two, so MX is a drain-time EXPONENT ADD + saturate — no multiply, no
+# change to the MAC cells. mx=0 (default) is bit-identical to plain fp8.
+A_SCALE_BYTES = MMA_M            # E8M0 scales, one per A row
+B_SCALE_BYTES = MMA_N            # E8M0 scales, one per B column
+E8M0_BIAS = 127                  # E8M0 value = 2^(X - 127), X in [0, 254]
+E8M0_NAN = 0xFF                  # X = 255 is the sole E8M0 special (NaN)
+
 # ── Tensor memory (distributed accumulators in MAC cells) ────────────
 TMEM_SLOTS = 4      # fp32 accumulator slots per MAC cell
 

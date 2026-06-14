@@ -364,8 +364,35 @@ the WASM Yosys. Real P&R area/timing arrive with OpenROAD in Phase 6.
 - [ ] chip_top GDS — **timing closed honestly, zero masked hold violations**
 - [ ] 2D/3D layout viewer deployed (GDS → web)
 
-## Phase 8 — HW block scaling
-- [ ] MX-style per-tile scale in LOAD path; ISA flag; golden + pymodel + RTL
+## Phase 8 — HW block scaling (MXFP8) ✅ design+verify (2026-06-14, branch `feat/phase8-mxfp8`)
+- [x] **MXFP8 microscaling, OCP MX spec** — each K=32 tile is exactly one MX
+      block, so scales are per-row (A: M E8M0 scales) / per-col (B: N E8M0).
+      C[i,j] = 2^((ea[i]-127)+(eb[j]-127)) · Σ_k decode(A)·decode(B).
+- [x] **golden/mxfp8.py** — bit-exact E8M0 decode + the drain-time
+      EXPONENT-ADD + saturate (`_scale_one_bits`): overflow→±inf,
+      underflow→±0, E8M0 NaN (X=255)→qNaN, inf/NaN/zero accumulator
+      passthroughs. 45 golden tests (scale edges + random matmul vs numpy).
+- [x] **pymodel** — `Mma` ISA gains `mx`/`sa_smem`/`sb_smem`; MacArray holds
+      per-slot scales, applied at `drain_read`; cmdproc fetches the M+N E8M0
+      bytes from SMEM. e2e MX matmul bit-exact vs golden; mx=0 unchanged.
+- [x] **RTL** — `mx_scale.sv` (combinational exponent-add+saturate, golden
+      twin) on the **drain/store path** (the 1024 MAC cells are untouched);
+      `mma_unit` fetches the scales (one extra mx-only read) and holds them
+      per-slot, answering store's matched-index lookup at write-back; cmdproc
+      decodes the `mx` field (packed in the MMA-unused g32/n32 + bit 140);
+      `chip_top` wires it. cocotb twins: `test_mx_scale` (vs golden),
+      mma_unit MX fetch/lookup, chip_top e2e MXFP8 — all bit-exact.
+- [x] **mx=0 is bit-identical** — full regression green (62→66 RTL cocotb
+      tests across 18 units, 37→84 Python tests), latch-check clean. The
+      five existing GDS paths are undisturbed.
+- [ ] Phase 8 GDS (needs Docker) — re-harden chip_top with the mx_scale
+      block on the drain path; sim/verification above is Docker-free and done.
+
+**Note:** the scale lives on the drain/store path, not the MAC array — a tiny
+exponent add, no multiply (E8M0 is power-of-two). A real HW constraint
+surfaced + documented: scale operands are read as one 32-B `RD_BYTES` line,
+so their SMEM base is 32-B aligned and the LOAD DMA writes a full 32-B line
+(smem_phys coalesces 16-B beats).
 
 ## Phase 9 — 2:4 structured sparsity
 - [ ] Metadata format; sparse operand select in mac_cell; 2× throughput e2e proof

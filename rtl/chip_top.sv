@@ -71,6 +71,12 @@ module chip_top #(
     wire        mma_start; wire [15:0] mma_a, mma_b;
     wire [1:0]  mma_slot;  wire mma_accum, mma_fmt; wire [3:0] mma_bar;
     wire        mma_busy;
+    wire        mma_mx;    wire [15:0] mma_sa, mma_sb;     // MXFP8 (Phase 8)
+
+    // ── MXFP8 scale lookup (store ↔ mma_unit) ────────────────────────
+    wire [$clog2(M*N)-1:0] mx_lk_idx;
+    wire                   mx_lk_en;
+    wire [7:0]             mx_lk_ea, mx_lk_eb;
 
     wire        st_start;  wire [3:0] st_bar;
     wire [31:0] st_gmem;   wire [1:0] st_slot; wire st_dtype;
@@ -163,7 +169,8 @@ module chip_top #(
         .ld_start(ld_start), .ld_bar(ld_bar), .ld_gmem(ld_gmem),
         .ld_smem(ld_smem), .ld_nbytes(ld_nbytes), .ld_busy(ld_busy),
         .mma_start(mma_start), .mma_a(mma_a), .mma_b(mma_b), .mma_slot(mma_slot),
-        .mma_accum(mma_accum), .mma_fmt(mma_fmt), .mma_bar(mma_bar), .mma_busy(mma_busy),
+        .mma_accum(mma_accum), .mma_fmt(mma_fmt), .mma_bar(mma_bar),
+        .mma_mx(mma_mx), .mma_sa(mma_sa), .mma_sb(mma_sb), .mma_busy(mma_busy),
         .st_start(st_start), .st_bar(st_bar), .st_gmem(st_gmem),
         .st_slot(st_slot), .st_dtype(st_dtype), .st_busy(st_busy)
     );
@@ -211,11 +218,14 @@ module chip_top #(
         .clk_s    (clk_s_tap),
         .start(mma_start), .a_smem(mma_a), .b_smem(mma_b),
         .slot(mma_slot), .accum(mma_accum), .fmt(mma_fmt),
+        .mx(mma_mx), .sa_smem(mma_sa), .sb_smem(mma_sb),
         .busy(mma_busy), .done(mma_done),
         .rd_a_addr(rd_a_addr), .rd_a_data(rd_a_data),
         .rd_b_addr(rd_b_addr), .rd_b_data(rd_b_data),
         .rd_stall(smem_rd_stall),
-        .drain_slot(drain_slot), .drain_idx(drain_idx), .drain_data(drain_data)
+        .drain_slot(drain_slot), .drain_idx(drain_idx), .drain_data(drain_data),
+        .mx_lk_idx(mx_lk_idx), .mx_lk_en(mx_lk_en),
+        .mx_lk_ea(mx_lk_ea), .mx_lk_eb(mx_lk_eb)
     );
 
     // ── STORE ────────────────────────────────────────────────────────
@@ -228,6 +238,8 @@ module chip_top #(
         .start_slot(st_slot), .start_dtype(st_dtype),
         .busy(st_busy), .done(st_done), .done_bar(st_done_bar),
         .drain_slot(drain_slot), .drain_idx(drain_idx), .drain_data(drain_data),
+        .mx_idx(mx_lk_idx), .mx_en(mx_lk_en),
+        .mx_ea(mx_lk_ea), .mx_eb(mx_lk_eb),
         .gmem_wr_en(gmem_wr_en), .gmem_wr_addr(gmem_wr_addr),
         .gmem_wr_data(gmem_wr_data), .gmem_wr_nbytes(gmem_wr_nbytes)
     );

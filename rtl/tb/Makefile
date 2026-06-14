@@ -26,6 +26,7 @@ all_leaves:
 	$(MAKE) sim TOP=fp32_add
 	$(MAKE) sim TOP=mac_cell
 	$(MAKE) sim TOP=fp8_encode
+	$(MAKE) sim TOP=mx_scale
 	$(MAKE) sim TOP=smem
 	$(MAKE) sim TOP=smem_phys
 	$(MAKE) sim TOP=barrier

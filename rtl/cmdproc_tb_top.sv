@@ -41,6 +41,9 @@ module cmdproc_tb_top #(
     output logic           mma_accum,
     output logic           mma_fmt,
     output logic [3:0]     mma_bar,
+    output logic           mma_mx,
+    output logic [15:0]    mma_sa,
+    output logic [15:0]    mma_sb,
 
     output logic           st_start,
     output logic [3:0]     st_bar,
@@ -66,7 +69,8 @@ module cmdproc_tb_top #(
         .ld_start(ld_start), .ld_bar(ld_bar), .ld_gmem(ld_gmem),
         .ld_smem(ld_smem), .ld_nbytes(ld_nbytes), .ld_busy(ld_busy),
         .mma_start(mma_start), .mma_a(mma_a), .mma_b(mma_b), .mma_slot(mma_slot),
-        .mma_accum(mma_accum), .mma_fmt(mma_fmt), .mma_bar(mma_bar), .mma_busy(mma_busy),
+        .mma_accum(mma_accum), .mma_fmt(mma_fmt), .mma_bar(mma_bar),
+        .mma_mx(mma_mx), .mma_sa(mma_sa), .mma_sb(mma_sb), .mma_busy(mma_busy),
         .st_start(st_start), .st_bar(st_bar), .st_gmem(st_gmem),
         .st_slot(st_slot), .st_dtype(st_dtype), .st_busy(st_busy)
     );

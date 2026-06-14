@@ -25,6 +25,10 @@ No general-purpose register file. Operands are immediates.
 - **Operands (A, B):** fp8 — **e4m3 or e5m2**, selected per-MMA by `fmt`.
 - **Accumulator (D):** fp32.
 - **Output:** fp32 or fp8-e4m3 — STORE selects via `dtype`.
+- **Block scale (MXFP8, Phase 8):** optional **E8M0** per-block scale —
+  8-bit, value `2^(X-127)`, `X∈[0,254]` (`X=255`=NaN). With K=32 = one OCP
+  MX block, A carries one scale per row (M), B one per column (N). Enabled
+  per-MMA by `mx`; applied as a fp32 **exponent add** at drain.
 
 ## Barrier objects (mbarrier)
 
@@ -56,7 +60,7 @@ Async DMA gmem → smem. `bytes` multiple of 16.
 - **Completion:** `bar.tx -= bytes; bar.pending -= 1` → flip rule
 - `gstep`/`sstep`: per-REPEAT-iteration strides (see REPEAT)
 
-### `MMA bar, A_smem, B_smem, slot, accum, fmt [, astep, bstep]`
+### `MMA bar, A_smem, B_smem, slot, accum, fmt [, astep, bstep] [, mx, sa_smem, sb_smem]`
 Async fp8 matmul: `tmem[slot] ← (accum ? tmem[slot] : 0) + A @ B^T`.
 
 - A is (M, K) fp8 row-major at `A_smem`; B is (N, K) fp8 row-major at `B_smem`
@@ -64,6 +68,14 @@ Async fp8 matmul: `tmem[slot] ← (accum ? tmem[slot] : 0) + A @ B^T`.
 - Takes K cycles (one K-step/cycle). **Completion:** `bar.pending -= 1`
 - v1 shape is fixed at (MMA_M, MMA_N, MMA_K) from `config.py`; the
   instruction carries no M/N/K fields (multi-shape is a Phase 10 extension)
+- **`mx` (MXFP8, Phase 8):** when 1, `sa_smem` points at the M E8M0 row
+  scales and `sb_smem` at the N E8M0 col scales (`X=255`=NaN). The accumulator
+  is unchanged; the scale `2^((ea[i]-127)+(eb[j]-127))` is applied to each
+  output element at **drain** as a fp32 exponent add + saturate
+  (overflow→±inf, underflow→±0). `mx=0` (default) is bit-identical to plain
+  fp8 — single-block op (use the plain accum K-loop for reduction).
+- **Scale operands** are read as one 32-B `RD_BYTES` line: `sa_smem`/`sb_smem`
+  are 32-B aligned and their LOAD writes a full 32-B line.
 
 ### `STORE bar, gmem, slot, dtype [, gstep]`
 **Async** drain of TMEM `slot` to gmem, row-major, one element/cycle.
@@ -154,7 +166,9 @@ Stride fields ride in a second 64-bit word for LOAD/MMA/STORE when the
 
 - **Multi-shape MMA** — deferred to Phase 10 (re-introduce M/N/K fields).
 - **SMEM↔TMEM moves** — not needed for v1 single-kernel matmuls.
-- **HW block scaling** — Phase 8: per-tile scale factors applied in the LOAD
-  path (MX-style), removing host-side prescaling.
+- **HW block scaling** — ✅ Phase 8: MXFP8 E8M0 per-block scales (`mx`
+  flag + `sa_smem`/`sb_smem`), applied as a fp32 exponent add at drain.
+  The actual MMA encoding packs them in the MMA-unused g32/n32 fields +
+  bit 140 (see `rtl/cmdproc.sv`).
 - **2:4 structured sparsity** — Phase 9: metadata-indexed operand select in
   the MAC cells.
