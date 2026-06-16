@@ -34,16 +34,19 @@ GRID_W, GRID_H = 1497.312, 1535.76
 RAM_W, RAM_H = 33.25, 84.0
 
 MARGIN = 2.16          # core-to-die (PDN-0351)
-W_STRIP = 172.8        # west strip width (SRAM col + logic + launch).
-                       # NOTE: widening this to 220 to give repair
-                       # buffers room BACKFIRED — the bigger die tipped
-                       # the full chip past the 7.7 GB RAM (DPL swap-
-                       # thrashed at 11% CPU). Wide die can't fit this
-                       # flow on this machine; keep it tight. The 1
-                       # stranded repair buffer is a SEPARATE problem
-                       # (HARDENING / STEPS — needs a targeted fix, not
-                       # floorplan area).
-N_STRIP = 43.2         # north strip height (B launch + north spine)
+W_STRIP = 220.32       # west strip width (SRAM col + logic + launch).
+                       # WIDE DIE (2026-06-15): the clk/clk_spine pins sit
+                       # on the far-west die edge (io_constraints below), so
+                       # CTS roots the clk_s_tap H-tree in the west. At the
+                       # tight 172.8 width the logic strip was too congested
+                       # for the legalizer's diamond search to find free
+                       # sites near those root buffers → CTS DPL-0036 (5
+                       # clk buffers stranded in the x<6.5 sliver). Widening
+                       # the strip gives the legalizer reachable whitespace.
+                       # This was the documented fix, previously blocked
+                       # ONLY by the 7.7 GB RAM wall (DPL swap-thrash); WSL
+                       # memory raised to 13 GB makes the wide die fit.
+N_STRIP = 64.8         # north strip height (B launch + north spine)
 HALO = 2.0             # MACRO_PLACE_HALO around every macro
 
 

@@ -27,6 +27,7 @@ for f in mac_grid.lef mac_grid_typ.lib 6_final.gds; do
 done
 
 DOCKER_CONFIG="${DOCKER_CONFIG_DIR}" docker run --rm \
+    ${DOCKER_MEM_ARGS:-} \
     -v "${REPO}:/work" -e PTAHCORE=/work \
     -w /OpenROAD-flow-scripts/flow "${IMAGE}" \
     bash -lc "source /OpenROAD-flow-scripts/env.sh 2>/dev/null || true

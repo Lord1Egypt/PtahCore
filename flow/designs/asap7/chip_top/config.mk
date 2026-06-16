@@ -15,6 +15,7 @@ export PLATFORM        = asap7
 # pattern, no BLOCKS nickname dance, no re-hardening.
 export VERILOG_FILES = \
   $(PTAHCORE)/rtl/fp8_decode.sv $(PTAHCORE)/rtl/fp8_encode.sv \
+  $(PTAHCORE)/rtl/mx_scale.sv \
   $(PTAHCORE)/rtl/ptah_clkbuf.sv $(PTAHCORE)/rtl/clk_spine.sv \
   $(PTAHCORE)/rtl/mac_array.sv $(PTAHCORE)/rtl/mma_unit.sv \
   $(PTAHCORE)/rtl/smem_phys.sv $(PTAHCORE)/rtl/barrier.sv \
@@ -50,12 +51,23 @@ export ADDITIONAL_GDS  += $(WORK_HOME)/results/asap7/mac_grid/base/6_final.gds
 # Floorplan (gen_floorplan.py — regenerate after geometry changes):
 # grid macro at the south-east, L-strip west (logic + SRAM column +
 # spine) and north (B launch) — CHIP_SPEC §3.
-export DIE_AREA  = 0 0 1674.432 1583.280
-export CORE_AREA = 2.160 2.160 1672.272 1581.120
+export DIE_AREA  = 0 0 1721.952 1604.880
+export CORE_AREA = 2.160 2.160 1719.792 1602.720
 export MACRO_PLACEMENT_TCL = $(PTAHCORE)/flow/designs/asap7/chip_top/macro_place.tcl
 export IO_CONSTRAINTS = $(PTAHCORE)/flow/designs/asap7/chip_top/io_constraints.tcl
 export MACRO_PLACE_HALO = 2 2
+# KEEP 0.40: lowering to 0.30 spread cells thinly and left no contiguous
+# gaps for the CTS buffer clusters -> regressed to CTS DPL-0036. 0.40 is
+# the density the wide die passed CTS at.
 export PLACE_DENSITY = 0.40
+
+# Routing-congestion relief (2026-06-15): the 16 SRAM macros funnel 4096
+# dout/wr data wires east out of one west column -> GRT-0116 horizontal
+# congestion on M3-M7 at the SRAM column (global util only 23%, pure local
+# pin-escape). Fix: open M8 (horizontal) + M9 (vertical) to the router --
+# tracks already exist; the default M7 cap left a whole H layer unused
+# right where the congestion is horizontal.
+export MAX_ROUTING_LAYER = M9
 
 # GPL's timing-driven resizer interleave stalled 45+ min at one
 # iteration chasing estimated-parasitic repairs through the grid
