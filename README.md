@@ -1,5 +1,12 @@
 # PtahCore 𓁰
 
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Lord1Egypt/PtahCore)](https://github.com/Lord1Egypt/PtahCore/releases)
+[![Stars](https://img.shields.io/github/stars/Lord1Egypt/PtahCore)](https://github.com/Lord1Egypt/PtahCore/stargazers)
+[![CI](https://github.com/Lord1Egypt/PtahCore/actions/workflows/ci.yml/badge.svg)](https://github.com/Lord1Egypt/PtahCore/actions)
+[![GDSII](https://img.shields.io/badge/GDSII-Phase%206%20Complete-brightgreen)](docs/HARDENING.md)
+[![FP8](https://img.shields.io/badge/FP8-e4m3%20%2B%20e5m2-ff6d00)](docs/ISA.md)
+
 > An open-source **FP8 tensor accelerator** — SystemVerilog RTL → synthesis → place-and-route → **7nm GDSII**, on a 100% open-source toolchain. Named after Ptah, the Egyptian creator god and patron of craftsmen & architects.
 
 🟢 **First GDS is out** — a full multi-tile FP8 matmul runs end-to-end through real SystemVerilog (`chip_top`), bit-exact against a golden numpy model, and the `mac_cell` tile has a **complete, signoff-clean 7nm GDSII on ASAP7**: 250 MHz with +1928 ps setup / +13 ps hold slack (zero violations, zero masked), DRC clean, 750 µm². Phase 6 of 10 done. Watch this repo: the fight with real silicon physics lands here as it happens.
@@ -35,6 +42,12 @@ cd rtl/tb && make all_leaves                # 52 RTL tests
 ```
 
 **89 tests green** (52 RTL + 37 Python).
+
+---
+
+## License
+
+PtahCore is released under the [Apache License 2.0](LICENSE).
 
 ---
 
